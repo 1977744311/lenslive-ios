@@ -55,21 +55,40 @@ struct HomeScreen: View {
     private var heroSection: some View {
         VStack(spacing: 14) {
             ZStack {
+                // 玻璃球体感（r5 设计稿）：径向渐变球面 + 顶部高光 + 渐变环
                 Circle()
-                    .fill(Color.white)
+                    .fill(RadialGradient(
+                        colors: [Color.white,
+                                 Color.white,
+                                 Color(hex: 0xEAF6EE)],
+                        center: UnitPoint(x: 0.38, y: 0.3),
+                        startRadius: 10, endRadius: 190))
                     .frame(width: 212, height: 212)
-                // 细描边渐变环（r1 设计稿：环更纤细、光晕更弥散）
                 Circle()
-                    .strokeBorder(LG.grad, lineWidth: 5)
+                    .fill(LinearGradient(colors: [Color.white.opacity(0.85), .clear],
+                                         startPoint: .top, endPoint: .center))
+                    .frame(width: 186, height: 186)
+                    .offset(y: -10)
+                    .blur(radius: 6)
+                // r9 设计稿：虹彩角向渐变环（青→蓝→绿→莱姆的冷暖过渡）
+                Circle()
+                    .strokeBorder(
+                        AngularGradient(colors: [LG.gradTeal,
+                                                 Color(hex: 0x54B8E8),
+                                                 LG.gradGreen,
+                                                 LG.gradLime,
+                                                 LG.gradTeal],
+                                        center: .center, angle: .degrees(120)),
+                        lineWidth: 5)
                     .frame(width: 212, height: 212)
                 // 资产位：assets/glasses-hero.png（集成时以 Image("glasses-hero") 替换）
                 Image(systemName: "eyeglasses")
                     .font(.system(size: 74, weight: .light))
                     .foregroundStyle(LG.ink.opacity(0.82))
             }
-            .shadow(color: LG.gradTeal.opacity(0.28), radius: 20, y: -4)
-            .shadow(color: LG.gradGreen.opacity(0.25), radius: 22, y: 8)
-            .shadow(color: LG.gradLime.opacity(0.22), radius: 30, y: 16)
+            .shadow(color: LG.gradTeal.opacity(0.32), radius: 22, y: -4)
+            .shadow(color: LG.gradGreen.opacity(0.30), radius: 26, y: 8)
+            .shadow(color: LG.gradLime.opacity(0.26), radius: 34, y: 16)
 
             HStack(spacing: 7) {
                 Circle()
@@ -83,9 +102,9 @@ struct HomeScreen: View {
             .accessibilityElement(children: .combine)
 
             HStack(spacing: 8) {
-                LGChip(label: "温度 \(thermalLabel)")
-                LGChip(label: "蓝牙 \(glassesConnected ? "稳定" : "待连接")")
-                LGChip(label: "屏幕 \(store.snapshot.glassesHealth.displayReady || !store.snapshot.isSessionActive ? "就绪" : "掉线")")
+                LGChip(label: "温度 \(thermalLabel)", icon: "thermometer.medium")
+                LGChip(label: "蓝牙 \(glassesConnected ? "稳定" : "待连接")", icon: "dot.radiowaves.left.and.right")
+                LGChip(label: "屏幕 \(store.snapshot.glassesHealth.displayReady || !store.snapshot.isSessionActive ? "就绪" : "掉线")", icon: "display")
             }
         }
         .padding(.top, 14)

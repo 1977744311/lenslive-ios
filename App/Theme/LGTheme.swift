@@ -16,8 +16,8 @@ enum LG {
     static let green = Color(hex: 0x34C759)
     static let gold = Color(hex: 0xC98A12)
 
-    // 夜航驾驶舱（直播控制台暗色，r2 自由设计稿）
-    static let nightBg = Color(hex: 0x070B12)
+    // 夜航驾驶舱（直播控制台暗色，r2 自由设计稿；r10 深海军蓝定稿）
+    static let nightBg = Color(hex: 0x081020)
     static let nightCard = Color.white.opacity(0.055)
     static let nightCardBorder = Color.white.opacity(0.09)
     static let nightInk = Color.white.opacity(0.94)
@@ -45,6 +45,15 @@ enum LG {
         ], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
+    /// CTA 用的浓一档绿渐变罩（r5/r9 设计稿：开播键更"发光"，右端莱姆更饱满）
+    static var gradCTA: LinearGradient {
+        LinearGradient(stops: [
+            .init(color: gradTeal.opacity(0.26), location: 0),
+            .init(color: gradGreen.opacity(0.22), location: 0.48),
+            .init(color: gradLime.opacity(0.34), location: 1),
+        ], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
     // 琥珀金（SC 卡，与眼镜端金卡语义统一）
     static var goldGrad: LinearGradient {
         LinearGradient(stops: [
@@ -62,10 +71,10 @@ enum LG {
         ], startPoint: .leading, endPoint: .trailing)
     }
 
-    // 结束直播红胶囊（r2 设计稿：略提亮的暖红）
+    // 结束直播红胶囊（r6 设计稿：夜航深红实底 + 亮红光环由按钮处叠加）
     static var endGrad: LinearGradient {
-        LinearGradient(colors: [Color(hex: 0xFF7259), Color(hex: 0xF23B2F)],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [Color(hex: 0xE03A2C), Color(hex: 0xA31E14)],
+                       startPoint: .top, endPoint: .bottom)
     }
 }
 
@@ -85,13 +94,13 @@ struct LGPageBackground: View {
     var body: some View {
         ZStack {
             LG.bg
-            RadialGradient(colors: [LG.gradTeal.opacity(0.10), .clear],
+            RadialGradient(colors: [LG.gradTeal.opacity(0.13), .clear],
                            center: UnitPoint(x: 0.82, y: -0.04),
                            startRadius: 0, endRadius: 300)
-            RadialGradient(colors: [LG.gradLime.opacity(0.11), .clear],
+            RadialGradient(colors: [LG.gradLime.opacity(0.13), .clear],
                            center: UnitPoint(x: 0.08, y: 1.08),
                            startRadius: 0, endRadius: 280)
-            RadialGradient(colors: [LG.gradGreen.opacity(0.09), .clear],
+            RadialGradient(colors: [LG.gradGreen.opacity(0.11), .clear],
                            center: UnitPoint(x: 0.92, y: 0.96),
                            startRadius: 0, endRadius: 240)
         }
@@ -195,14 +204,22 @@ struct LGOrb: View {
 
 struct LGChip: View {
     let label: String
+    var icon: String? = nil
     var dark = false
 
     var body: some View {
-        Text(label)
-            .font(.system(.footnote, weight: .medium))
-            .foregroundStyle(dark ? Color.white : LG.ink)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 7)
+        HStack(spacing: 5) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(.caption2, weight: .medium))
+                    .foregroundStyle(dark ? Color.white.opacity(0.7) : LG.gradGreen)
+            }
+            Text(label)
+                .font(.system(.footnote, weight: .medium))
+                .foregroundStyle(dark ? Color.white : LG.ink)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 7)
             .background {
                 Capsule().fill(.ultraThinMaterial)
                 Capsule().fill(dark ? Color(hex: 0x14161E).opacity(0.42) : Color.white.opacity(0.70))
@@ -323,7 +340,7 @@ struct LGPrimaryCTA: View {
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
                     .fill(Color.white)
                 RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(LG.gradSoft)
+                    .fill(LG.gradCTA)
                 VStack {
                     Rectangle()
                         .fill(Color.white.opacity(0.95))

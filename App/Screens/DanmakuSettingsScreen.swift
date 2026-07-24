@@ -56,21 +56,28 @@ struct DanmakuSettingsScreen: View {
                 .accessibilityLabel("弹幕过滤")
                 .accessibilityValue(store.snapshot.filterMode.displayName)
             }
-            // r4 设计稿：预览放大 + 波导微光描边
+            // r4+r8 设计稿：预览放大 + 设备壳层（bezel）+ 波导微光；1:1 比例是硬件事实，不拉宽
             GlassPreviewView(node: store.previewNode)
-                .frame(width: 200, height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(colors: [LG.gradTeal.opacity(0.55),
-                                                    Color.white.opacity(0.25),
-                                                    LG.gradGreen.opacity(0.5)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                            lineWidth: 1.5)
+                .frame(width: 224, height: 224)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(9)
+                .background {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color(hex: 0x171B21))
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
                 }
-                .shadow(color: LG.gradTeal.opacity(0.22), radius: 14, y: 4)
-                .shadow(color: Color(hex: 0x1E2232).opacity(0.16), radius: 10, y: 6)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(colors: [LG.gradTeal.opacity(0.45),
+                                                    Color.white.opacity(0.15),
+                                                    LG.gradGreen.opacity(0.4)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 1)
+                }
+                .shadow(color: LG.gradTeal.opacity(0.25), radius: 16, y: 4)
+                .shadow(color: Color(hex: 0x1E2232).opacity(0.18), radius: 12, y: 8)
             Text("黑色区域在光波导上即透明（加色显示）")
                 .font(.system(.caption2))
                 .foregroundStyle(LG.sec)

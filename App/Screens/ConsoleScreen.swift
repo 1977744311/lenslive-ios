@@ -151,10 +151,10 @@ struct ConsoleScreen: View {
             VStack(spacing: 10) {
                 Image(systemName: "video")
                     .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(Color(hex: 0x8FE8CE).opacity(0.75))
                 Text("POV 预览 · 等待眼镜相机帧")
                     .font(.system(.footnote))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(Color(hex: 0xB8D8CE).opacity(0.7))
                 HStack(spacing: 8) {
                     statChip(statBitrate)
                     statChip(statFps)
@@ -163,16 +163,16 @@ struct ConsoleScreen: View {
             }
         }
         .frame(height: 298)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(LG.grad, lineWidth: 4.5)
-                .padding(-4.5)
+            // r6 设计稿：发丝霓虹细边替代粗描边（r10 微调至 2.5）
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .strokeBorder(LG.grad, lineWidth: 2.5)
+                .padding(-2.5)
         }
-        // r2 设计稿：光晕收敛贴边，不做大面积雾状投影
-        .shadow(color: LG.gradTeal.opacity(0.30), radius: 10, y: -2)
-        .shadow(color: LG.gradGreen.opacity(0.28), radius: 12, y: 4)
-        .shadow(color: LG.gradLime.opacity(0.25), radius: 16, y: 8)
+        .shadow(color: LG.gradTeal.opacity(0.35), radius: 12, y: -2)
+        .shadow(color: LG.gradGreen.opacity(0.30), radius: 14, y: 4)
+        .shadow(color: LG.gradLime.opacity(0.22), radius: 18, y: 8)
         .padding(.horizontal, 2)
     }
 
@@ -305,12 +305,12 @@ struct ConsoleScreen: View {
                         Capsule().fill(LG.endGrad)
                     }
                     .overlay {
-                        Capsule().strokeBorder(Color.white.opacity(0.45), lineWidth: 1.5)
-                            .blendMode(.plusLighter)
+                        // r6 设计稿：亮红光环边替代白高光边
+                        Capsule().strokeBorder(Color(hex: 0xFF7A66).opacity(0.85), lineWidth: 1.5)
                     }
-                    // 夜航底上红胶囊要"发光"而不是投影（r2 自由设计稿）
-                    .shadow(color: LG.red.opacity(0.55), radius: 18, y: 6)
-                    .shadow(color: LG.red.opacity(0.30), radius: 34, y: 0)
+                    // 夜航底上红胶囊要"发光"而不是投影（r2 自由设计稿，r10 加足）
+                    .shadow(color: LG.red.opacity(0.60), radius: 18, y: 6)
+                    .shadow(color: LG.red.opacity(0.34), radius: 36, y: 0)
             }
             .buttonStyle(.plain)
             // 眼镜端过滤档循环：全部 → 仅高价值 → 暂停（与 captouch 单击语义一致）
@@ -373,10 +373,11 @@ private struct DanmakuRow: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            // r10 设计稿：全胶囊形弹幕卡
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(LG.nightCard)
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(LG.nightCardBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(LG.gradTeal.opacity(0.22), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
     }
@@ -402,12 +403,13 @@ private struct SuperChatCard: View {
                     Text(event.user)
                         .font(.system(.subheadline, weight: .bold))
                         .foregroundStyle(LG.nightInk)
+                    // r6 设计稿：金底深字徽标，对比更强
                     Text(badgeText)
                         .font(.system(.footnote, weight: .heavy))
-                        .foregroundStyle(Color(hex: 0xFFC96A))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 2.5)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0xFFC44D).opacity(0.16)))
+                        .foregroundStyle(Color(hex: 0x2A1B04))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(LG.goldGrad))
                 }
                 Text(event.text)
                     .font(.system(.callout, weight: .medium))
@@ -415,8 +417,9 @@ private struct SuperChatCard: View {
             }
             Spacer(minLength: 6)
             Image(systemName: "star")
-                .font(.system(size: 22, weight: .regular))
-                .foregroundStyle(Color(hex: 0xFFC96A))
+                .font(.system(size: 26, weight: .regular))
+                .foregroundStyle(Color(hex: 0xFFD98A))
+                .shadow(color: Color(hex: 0xFFAA40).opacity(0.6), radius: 6)
         }
         .accessibilityElement(children: .combine)
         .padding(.leading, 13)
@@ -429,9 +432,9 @@ private struct SuperChatCard: View {
                                           startPoint: .leading, endPoint: .trailing))
         }
         .overlay {
-            Capsule().strokeBorder(LG.goldGrad, lineWidth: 1.5)
+            Capsule().strokeBorder(LG.goldGrad, lineWidth: 1)
         }
-        .shadow(color: Color(hex: 0xFFAA40).opacity(0.30), radius: 16, y: 4)
+        .shadow(color: Color(hex: 0xFFAA40).opacity(0.36), radius: 18, y: 4)
     }
 
     private var badgeText: String {

@@ -16,7 +16,7 @@ struct TargetsScreen: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("推流目标")
                         .font(.system(.largeTitle, weight: .heavy))
@@ -203,13 +203,13 @@ private struct TargetCard: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                // 平台品牌图标徽章（r3 设计稿）
+                // 平台品牌图标徽章（r3 设计稿，r7 加大）
                 Image(systemName: brandSymbol)
                     .font(.system(.body, weight: .medium))
                     .foregroundStyle(brandColor)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(brandColor.opacity(0.12))
                     }
                 VStack(alignment: .leading, spacing: 3) {
@@ -237,8 +237,8 @@ private struct TargetCard: View {
                 }
             }
             .padding(.horizontal, 17)
-            .padding(.vertical, 15)
-            .lgGlassCard(cornerRadius: 20, gradientBorder: selected)
+            .padding(.vertical, 16)
+            .lgGlassCard(cornerRadius: 24, gradientBorder: selected)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
