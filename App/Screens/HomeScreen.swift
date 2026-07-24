@@ -53,25 +53,29 @@ struct HomeScreen: View {
     // MARK: - 渐变圆环 + 眼镜 hero + 连接状态 + chips
 
     private var heroSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(LG.grad)
-                    .frame(width: 212, height: 212)
-                Circle()
                     .fill(Color.white)
-                    .frame(width: 206, height: 206)
+                    .frame(width: 212, height: 212)
+                // 细描边渐变环（r1 设计稿：环更纤细、光晕更弥散）
+                Circle()
+                    .strokeBorder(LG.grad, lineWidth: 5)
+                    .frame(width: 212, height: 212)
                 // 资产位：assets/glasses-hero.png（集成时以 Image("glasses-hero") 替换）
                 Image(systemName: "eyeglasses")
                     .font(.system(size: 74, weight: .light))
                     .foregroundStyle(LG.ink.opacity(0.82))
             }
-            .lgGlow()
+            .shadow(color: LG.gradTeal.opacity(0.28), radius: 20, y: -4)
+            .shadow(color: LG.gradGreen.opacity(0.25), radius: 22, y: 8)
+            .shadow(color: LG.gradLime.opacity(0.22), radius: 30, y: 16)
 
             HStack(spacing: 7) {
                 Circle()
                     .fill(glassesConnected ? LG.green : LG.ter)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 9, height: 9)
+                    .shadow(color: glassesConnected ? LG.green.opacity(0.5) : .clear, radius: 3)
                 Text(glassesConnected ? "已连接 · Ray-Ban Display" : "待连接 · Ray-Ban Display")
                     .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(LG.ink)
@@ -84,8 +88,8 @@ struct HomeScreen: View {
                 LGChip(label: "屏幕 \(store.snapshot.glassesHealth.displayReady || !store.snapshot.isSessionActive ? "就绪" : "掉线")")
             }
         }
-        .padding(.top, 10)
-        .padding(.bottom, 2)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
     }
 
     private var glassesConnected: Bool {

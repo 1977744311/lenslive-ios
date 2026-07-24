@@ -167,6 +167,11 @@ final class LiveSessionStore {
         isMockMode || keychain.hasValue(forKey: selectedTarget.streamKeyRef)
     }
 
+    /// 密钥明文（仅供本机界面显隐切换；界面默认脱敏显示）
+    func streamKeyPlaintext() -> String? {
+        keychain.read(forKey: selectedTarget.streamKeyRef) ?? (isMockMode ? "mock-stream-key" : nil)
+    }
+
     /// 眼镜端实时预览 = 与 Coordinator 相同的渲染树本地复算（所见即所得）
     var previewNode: GlassNode {
         let lineCount = settings.displayLineCount

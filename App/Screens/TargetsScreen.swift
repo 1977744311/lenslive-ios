@@ -11,15 +11,24 @@ struct TargetsScreen: View {
     @State private var editingKey = false
     @State private var serverDraft = ""
     @State private var keyDraft = ""
+    @State private var keyRevealed = false
+    @State private var serverCopied = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 10) {
-                Text("推流目标")
-                    .font(.system(.largeTitle, weight: .heavy))
-                    .foregroundStyle(LG.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 6)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("推流目标")
+                        .font(.system(.largeTitle, weight: .heavy))
+                        .foregroundStyle(LG.ink)
+                    Text("LIVE STREAMING")
+                        .font(.system(.caption2, weight: .semibold))
+                        .tracking(2.5)
+                        .foregroundStyle(LG.ter)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 6)
+                .accessibilityElement(children: .combine)
 
                 ForEach(store.targets) { target in
                     TargetCard(target: target, selected: target.id == store.selectedTarget.id) {
@@ -33,9 +42,14 @@ struct TargetsScreen: View {
                 Button {
                     showGuide = true
                 } label: {
-                    LGGradientText(text: "如何获取推流地址？")
-                        .frame(minHeight: 44)   // 纯文字入口补足触达目标
-                        .contentShape(Rectangle())
+                    HStack(spacing: 6) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(.subheadline, weight: .semibold))
+                            .foregroundStyle(LG.gradGreen)
+                        LGGradientText(text: "如何获取推流地址？")
+                    }
+                    .frame(minHeight: 44)   // 纯文字入口补足触达目标
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -78,6 +92,23 @@ struct TargetsScreen: View {
                     .foregroundStyle(LG.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                // 复制地址（r3 设计稿），短暂对钩反馈
+                Button {
+                    UIPasteboard.general.string = store.selectedTarget.serverURL
+                    serverCopied = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        serverCopied = false
+                    }
+                } label: {
+                    Image(systemName: serverCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(.footnote))
+                        .foregroundStyle(serverCopied ? LG.green : LG.sec)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("复制服务器地址")
             }
             .onTapGesture {
                 serverDraft = store.selectedTarget.serverURL
@@ -87,10 +118,32 @@ struct TargetsScreen: View {
             Rectangle().fill(LG.hair).frame(height: 0.5).padding(.leading, 17)
 
             configRow(label: "串流密钥") {
-                Text(store.hasStreamKey ? "••••••••" : "未配置")
-                    .font(.system(.subheadline))
-                    .kerning(store.hasStreamKey ? 3 : 0)
-                    .foregroundStyle(store.hasStreamKey ? LG.ink : LG.sec)
+                if keyRevealed, let key = store.streamKeyPlaintext() {
+                    Text(key)
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundStyle(LG.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Text(store.hasStreamKey ? "••••••••" : "未配置")
+                        .font(.system(.subheadline))
+                        .kerning(store.hasStreamKey ? 3 : 0)
+                        .foregroundStyle(store.hasStreamKey ? LG.ink : LG.sec)
+                }
+                if store.hasStreamKey {
+                    // 显隐切换（r3 设计稿）
+                    Button {
+                        keyRevealed.toggle()
+                    } label: {
+                        Image(systemName: keyRevealed ? "eye.slash" : "eye")
+                            .font(.system(.footnote))
+                            .foregroundStyle(LG.sec)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(keyRevealed ? "隐藏密钥" : "显示密钥")
+                }
             }
             .onTapGesture { editingKey = true }
 
@@ -99,9 +152,16 @@ struct TargetsScreen: View {
             configRow(label: "连接测试") {
                 switch store.connectionTest {
                 case .notRun:
+                    // 胶囊按钮样式（r3 设计稿）
                     Text("点按测试")
-                        .font(.system(.subheadline))
-                        .foregroundStyle(LG.sec)
+                        .font(.system(.footnote, weight: .semibold))
+                        .foregroundStyle(LG.gradGreen)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background {
+                            Capsule().fill(LG.gradGreen.opacity(0.10))
+                            Capsule().strokeBorder(LG.gradGreen.opacity(0.45), lineWidth: 1)
+                        }
                 case .testing:
                     ProgressView().controlSize(.small)
                 case .passed(let ms):
@@ -143,6 +203,15 @@ private struct TargetCard: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
+                // 平台品牌图标徽章（r3 设计稿）
+                Image(systemName: brandSymbol)
+                    .font(.system(.body, weight: .medium))
+                    .foregroundStyle(brandColor)
+                    .frame(width: 40, height: 40)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(brandColor.opacity(0.12))
+                    }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(target.name)
                         .font(.system(.callout, weight: .semibold))
@@ -182,6 +251,27 @@ private struct TargetCard: View {
         case .twitch: return "官方 ingest · 全球节点"
         case .youtube: return "官方 ingest"
         case .custom: return "抖音等：从 PC 直播伴侣获取临时码"
+        }
+    }
+
+    // SF Symbols 近似平台品牌（正式版可换真实 logo 资产）
+    private var brandSymbol: String {
+        switch target.preset {
+        case .bilibiliLiveHime: return "tv"
+        case .bilibiliDirect: return "dot.radiowaves.up.forward"
+        case .twitch: return "gamecontroller"
+        case .youtube: return "play.rectangle.fill"
+        case .custom: return "link"
+        }
+    }
+
+    private var brandColor: Color {
+        switch target.preset {
+        case .bilibiliLiveHime: return Color(hex: 0x00AEEC)   // B 站蓝
+        case .bilibiliDirect: return Color(hex: 0x00AEEC)
+        case .twitch: return Color(hex: 0x9146FF)             // Twitch 紫
+        case .youtube: return Color(hex: 0xFF0033)            // YouTube 红
+        case .custom: return LG.gradGreen
         }
     }
 }

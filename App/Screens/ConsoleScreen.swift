@@ -31,7 +31,8 @@ struct ConsoleScreen: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 12)
-        .lgPage()
+        .background(nightBackground)
+        .preferredColorScheme(.dark)
         // captouch backOnRoot → 手机端弹同一个确认（PRD F6）
         .onChange(of: store.snapshot.awaitingEndConfirmation) { _, awaiting in
             if awaiting { showEndConfirm = true }
@@ -55,32 +56,49 @@ struct ConsoleScreen: View {
         store.snapshot.phase == .preparing
     }
 
+    // 夜航驾驶舱底色：深海军蓝 + 青绿星云微光（r2 自由设计稿）
+    private var nightBackground: some View {
+        ZStack {
+            LG.nightBg
+            RadialGradient(colors: [LG.gradTeal.opacity(0.14), .clear],
+                           center: UnitPoint(x: 0.9, y: 0.05),
+                           startRadius: 0, endRadius: 340)
+            RadialGradient(colors: [LG.gradGreen.opacity(0.10), .clear],
+                           center: UnitPoint(x: 0.06, y: 0.4),
+                           startRadius: 0, endRadius: 300)
+            RadialGradient(colors: [LG.gradTeal.opacity(0.08), .clear],
+                           center: UnitPoint(x: 0.5, y: 1.05),
+                           startRadius: 0, endRadius: 320)
+        }
+        .ignoresSafeArea()
+    }
+
     // MARK: - 玻璃胶囊状态栏
 
     private var statusBar: some View {
         HStack {
-            LGGlassCapsule {
+            LGGlassCapsule(dark: true) {
                 HStack(spacing: 10) {
                     if isPreparing {
                         // 连接尚未建立：不亮红 LIVE，给明确的进行中反馈
                         ProgressView()
                             .controlSize(.small)
-                            .tint(LG.ink)
+                            .tint(LG.nightInk)
                         Text("准备中")
                             .font(.system(.subheadline, weight: .heavy))
                             .tracking(1.5)
-                            .foregroundStyle(LG.ink)
+                            .foregroundStyle(LG.nightInk)
                     } else {
                         Circle()
                             .fill(LG.red)
                             .frame(width: 9, height: 9)
-                            .shadow(color: LG.red.opacity(0.55), radius: 4)
+                            .shadow(color: LG.red.opacity(0.8), radius: 5)
                         Text("LIVE")
                             .font(.system(.subheadline, weight: .heavy))
                             .tracking(1.5)
-                            .foregroundStyle(LG.ink)
+                            .foregroundStyle(LG.nightInk)
                         Rectangle()
-                            .fill(LG.hair)
+                            .fill(LG.nightHair)
                             .frame(width: 1, height: 15)
                         // 走秒由 TimelineView 驱动，与快照 startedAt 对齐
                         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -88,7 +106,7 @@ struct ConsoleScreen: View {
                                 .font(.system(.body, weight: .bold))
                                 .monospacedDigit()
                                 .kerning(0.5)
-                                .foregroundStyle(LG.ink)
+                                .foregroundStyle(LG.nightInk)
                         }
                     }
                 }
@@ -96,14 +114,14 @@ struct ConsoleScreen: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(isPreparing ? "准备中" : "直播中，已进行 \(elapsedText)")
             Spacer()
-            LGGlassCapsule {
+            LGGlassCapsule(dark: true) {
                 HStack(spacing: 7) {
                     Image(systemName: "person")
                         .font(.system(.footnote, weight: .medium))
-                        .foregroundStyle(Color(hex: 0x14161C).opacity(0.5))
+                        .foregroundStyle(LG.nightSec)
                     Text(viewersText)
                         .font(.system(.subheadline, weight: .semibold))
-                        .foregroundStyle(LG.ink)
+                        .foregroundStyle(LG.nightInk)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -148,10 +166,13 @@ struct ConsoleScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(LG.grad, lineWidth: 4)
-                .padding(-4)
+                .strokeBorder(LG.grad, lineWidth: 4.5)
+                .padding(-4.5)
         }
-        .lgGlow()
+        // r2 设计稿：光晕收敛贴边，不做大面积雾状投影
+        .shadow(color: LG.gradTeal.opacity(0.30), radius: 10, y: -2)
+        .shadow(color: LG.gradGreen.opacity(0.28), radius: 12, y: 4)
+        .shadow(color: LG.gradLime.opacity(0.25), radius: 16, y: 8)
         .padding(.horizontal, 2)
     }
 
@@ -229,7 +250,7 @@ struct ConsoleScreen: View {
     private var danmakuFeed: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: 14) {
                     ForEach(store.snapshot.danmakuBuffer.suffix(60)) { event in
                         if event.isHighValue && event.kind != .chat {
                             SuperChatCard(event: event)
@@ -261,7 +282,7 @@ struct ConsoleScreen: View {
     private var dock: some View {
         HStack(spacing: 14) {
             // 收起/展开 POV 预览（收起后弹幕流占满，指标条仍在）
-            LGRoundGlassButton(systemName: previewCollapsed ? "video.slash" : "video") {
+            LGRoundGlassButton(systemName: previewCollapsed ? "video.slash" : "video", dark: true) {
                 if reduceMotion {
                     previewCollapsed.toggle()
                 } else {
@@ -287,11 +308,13 @@ struct ConsoleScreen: View {
                         Capsule().strokeBorder(Color.white.opacity(0.45), lineWidth: 1.5)
                             .blendMode(.plusLighter)
                     }
-                    .shadow(color: LG.red.opacity(0.38), radius: 15, y: 12)
+                    // 夜航底上红胶囊要"发光"而不是投影（r2 自由设计稿）
+                    .shadow(color: LG.red.opacity(0.55), radius: 18, y: 6)
+                    .shadow(color: LG.red.opacity(0.30), radius: 34, y: 0)
             }
             .buttonStyle(.plain)
             // 眼镜端过滤档循环：全部 → 仅高价值 → 暂停（与 captouch 单击语义一致）
-            LGRoundGlassButton(systemName: filterIcon, tint: filterTint) {
+            LGRoundGlassButton(systemName: filterIcon, tint: filterTint, dark: true) {
                 store.cycleFilterMode()
             }
             .accessibilityLabel("弹幕过滤")
@@ -326,27 +349,35 @@ private struct DanmakuRow: View {
     let startedAt: Date?
 
     var body: some View {
+        // 夜航胶囊卡：每条弹幕独立暗玻璃容器（r2 自由设计稿）
         HStack(alignment: .top, spacing: 12) {
-            LGAvatarPlaceholder(name: event.user, size: 42)
-            VStack(alignment: .leading, spacing: 4) {
+            LGAvatarPlaceholder(name: event.user, size: 40, dark: true)
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(event.user)
                         .font(.system(.footnote, weight: .medium))
-                        .foregroundStyle(LG.sec)
+                        .foregroundStyle(LG.gradGreen)
                     Spacer()
                     Text(relativeTime)
                         .font(.system(.caption))
                         .monospacedDigit()
-                        .foregroundStyle(LG.sec)
+                        .foregroundStyle(LG.nightSec)
                 }
                 Text(event.text)
                     .font(.system(.callout))
-                    .foregroundStyle(event.kind == .enter ? LG.sec : LG.ink)
+                    .foregroundStyle(event.kind == .enter ? LG.nightSec : LG.nightInk)
                     .lineSpacing(3)
             }
             .padding(.top, 1)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(LG.nightCard)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(LG.nightCardBorder, lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
     }
 
@@ -363,42 +394,44 @@ private struct SuperChatCard: View {
     let event: DanmakuEvent
 
     var body: some View {
+        // 夜航金卡：暗琥珀玻璃底 + 金描边微光（与眼镜端金卡语义统一）
         HStack(spacing: 12) {
-            LGAvatarPlaceholder(name: event.user, size: 44)
+            LGAvatarPlaceholder(name: event.user, size: 44, dark: true)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 9) {
                     Text(event.user)
                         .font(.system(.subheadline, weight: .bold))
-                        .foregroundStyle(LG.ink)
+                        .foregroundStyle(LG.nightInk)
                     Text(badgeText)
                         .font(.system(.footnote, weight: .heavy))
-                        .foregroundStyle(LG.gold)
+                        .foregroundStyle(Color(hex: 0xFFC96A))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 2.5)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0xFFC44D).opacity(0.20)))
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0xFFC44D).opacity(0.16)))
                 }
                 Text(event.text)
                     .font(.system(.callout, weight: .medium))
-                    .foregroundStyle(LG.ink)
+                    .foregroundStyle(LG.nightInk)
             }
             Spacer(minLength: 6)
             Image(systemName: "star")
                 .font(.system(size: 22, weight: .regular))
-                .foregroundStyle(Color(hex: 0xE3B23C))
+                .foregroundStyle(Color(hex: 0xFFC96A))
         }
         .accessibilityElement(children: .combine)
         .padding(.leading, 13)
         .padding(.trailing, 20)
         .padding(.vertical, 12)
         .background {
-            Capsule().fill(Color.white)
-            Capsule().fill(LG.scCardFill)
+            Capsule().fill(Color(hex: 0x1A1206).opacity(0.85))
+            Capsule().fill(LinearGradient(colors: [Color(hex: 0xFFC44D).opacity(0.14),
+                                                   Color(hex: 0xFF9240).opacity(0.10)],
+                                          startPoint: .leading, endPoint: .trailing))
         }
         .overlay {
-            Capsule().strokeBorder(LG.goldGrad, lineWidth: 2)
+            Capsule().strokeBorder(LG.goldGrad, lineWidth: 1.5)
         }
-        .shadow(color: Color(hex: 0xFFAA40).opacity(0.28), radius: 15, y: 8)
-        .shadow(color: Color(hex: 0xFF9240).opacity(0.22), radius: 8, y: 4)
+        .shadow(color: Color(hex: 0xFFAA40).opacity(0.30), radius: 16, y: 4)
     }
 
     private var badgeText: String {

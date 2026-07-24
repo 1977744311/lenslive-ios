@@ -56,10 +56,21 @@ struct DanmakuSettingsScreen: View {
                 .accessibilityLabel("弹幕过滤")
                 .accessibilityValue(store.snapshot.filterMode.displayName)
             }
+            // r4 设计稿：预览放大 + 波导微光描边
             GlassPreviewView(node: store.previewNode)
-                .frame(width: 168, height: 168)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Color(hex: 0x1E2232).opacity(0.18), radius: 10, y: 6)
+                .frame(width: 200, height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(colors: [LG.gradTeal.opacity(0.55),
+                                                    Color.white.opacity(0.25),
+                                                    LG.gradGreen.opacity(0.5)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 1.5)
+                }
+                .shadow(color: LG.gradTeal.opacity(0.22), radius: 14, y: 4)
+                .shadow(color: Color(hex: 0x1E2232).opacity(0.16), radius: 10, y: 6)
             Text("黑色区域在光波导上即透明（加色显示）")
                 .font(.system(.caption2))
                 .foregroundStyle(LG.sec)
@@ -72,12 +83,13 @@ struct DanmakuSettingsScreen: View {
     // MARK: - 数据源
 
     private var sourcesCard: some View {
+        // 品牌图标徽章与推流目标屏统一（r4 设计稿）
         VStack(spacing: 0) {
-            LGRow(icon: "bubble.left", title: "B 站",
+            LGRow(icon: "tv", iconTint: Color(hex: 0x00AEEC), title: "B 站",
                   value: biliConnected ? "已连接" : "未连接",
                   valueColor: biliConnected ? LG.green : LG.sec)
-            LGRow(icon: "bubble.left", title: "Twitch", value: "未绑定")
-            LGRow(icon: "bubble.left", title: "YouTube", value: "未绑定", isLast: true)
+            LGRow(icon: "gamecontroller", iconTint: Color(hex: 0x9146FF), title: "Twitch", value: "未绑定")
+            LGRow(icon: "play.rectangle.fill", iconTint: Color(hex: 0xFF0033), title: "YouTube", value: "未绑定", isLast: true)
         }
         .lgGlassCard(cornerRadius: 20)
     }
@@ -95,7 +107,8 @@ struct DanmakuSettingsScreen: View {
                     Button("\(count) 条") { store.settings.displayLineCount = count }
                 }
             } label: {
-                LGRow(title: "显示条数", value: "\(store.settings.displayLineCount) 条")
+                LGRow(icon: "square.3.layers.3d", iconTint: LG.gradTeal,
+                      title: "显示条数", value: "\(store.settings.displayLineCount) 条")
             }
             .buttonStyle(.plain)
 
@@ -103,7 +116,8 @@ struct DanmakuSettingsScreen: View {
                 Button("0.5 秒") { store.settings.displayThrottle = 0.5 }
                 Button("1 秒") { store.settings.displayThrottle = 1 }
             } label: {
-                LGRow(title: "刷新节流", value: throttleLabel)
+                LGRow(icon: "arrow.trianglehead.2.clockwise", iconTint: LG.gradGreen,
+                      title: "刷新节流", value: throttleLabel)
             }
             .buttonStyle(.plain)
 
@@ -111,7 +125,8 @@ struct DanmakuSettingsScreen: View {
                 Button("8 秒") { store.settings.highValueDwell = 8 }
                 Button("10 秒") { store.settings.highValueDwell = 10 }
             } label: {
-                LGRow(title: "高价值卡驻留", value: "\(Int(store.settings.highValueDwell)) 秒", isLast: true)
+                LGRow(icon: "star", iconTint: LG.gold,
+                      title: "高价值卡驻留", value: "\(Int(store.settings.highValueDwell)) 秒", isLast: true)
             }
             .buttonStyle(.plain)
         }
@@ -126,15 +141,27 @@ struct DanmakuSettingsScreen: View {
 
     private func filtersCard(_ store: Bindable<LiveSessionStore>) -> some View {
         VStack(spacing: 0) {
-            toggleRow("提问识别高亮", isOn: store.settings.highlightQuestions, isLast: false)
-            toggleRow("屏蔽进场消息", isOn: store.settings.blockEnterMessages, isLast: false)
-            toggleRow("洪峰保护", isOn: store.settings.floodProtection, isLast: true)
+            toggleRow("提问识别高亮", icon: "questionmark.bubble", tint: LG.gradTeal,
+                      isOn: store.settings.highlightQuestions, isLast: false)
+            toggleRow("屏蔽进场消息", icon: "person.slash", tint: LG.gradGreen,
+                      isOn: store.settings.blockEnterMessages, isLast: false)
+            toggleRow("洪峰保护", icon: "bolt.shield", tint: LG.gold,
+                      isOn: store.settings.floodProtection, isLast: true)
         }
         .lgGlassCard(cornerRadius: 20)
     }
 
-    private func toggleRow(_ title: String, isOn: Binding<Bool>, isLast: Bool) -> some View {
-        HStack {
+    private func toggleRow(_ title: String, icon: String, tint: Color,
+                           isOn: Binding<Bool>, isLast: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(.footnote, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tint.opacity(0.12))
+                }
             Text(title)
                 .font(.system(.callout))
                 .foregroundStyle(LG.ink)
@@ -148,7 +175,7 @@ struct DanmakuSettingsScreen: View {
         .frame(minHeight: 54)
         .overlay(alignment: .bottom) {
             if !isLast {
-                Rectangle().fill(LG.hair).frame(height: 0.5).padding(.leading, 18)
+                Rectangle().fill(LG.hair).frame(height: 0.5).padding(.leading, 64)
             }
         }
     }

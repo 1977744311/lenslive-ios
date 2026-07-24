@@ -16,6 +16,14 @@ enum LG {
     static let green = Color(hex: 0x34C759)
     static let gold = Color(hex: 0xC98A12)
 
+    // 夜航驾驶舱（直播控制台暗色，r2 自由设计稿）
+    static let nightBg = Color(hex: 0x070B12)
+    static let nightCard = Color.white.opacity(0.055)
+    static let nightCardBorder = Color.white.opacity(0.09)
+    static let nightInk = Color.white.opacity(0.94)
+    static let nightSec = Color.white.opacity(0.55)
+    static let nightHair = Color.white.opacity(0.12)
+
     // 主渐变三色（linear 135°，中停点 48%）
     static let gradTeal = Color(hex: 0x12BEA4)
     static let gradGreen = Color(hex: 0x33CB7B)
@@ -54,9 +62,9 @@ enum LG {
         ], startPoint: .leading, endPoint: .trailing)
     }
 
-    // 结束直播红胶囊
+    // 结束直播红胶囊（r2 设计稿：略提亮的暖红）
     static var endGrad: LinearGradient {
-        LinearGradient(colors: [Color(hex: 0xFF6A55), Color(hex: 0xF03B30)],
+        LinearGradient(colors: [Color(hex: 0xFF7259), Color(hex: 0xF23B2F)],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
@@ -209,6 +217,7 @@ struct LGChip: View {
 // MARK: - 玻璃胶囊（控制台状态栏等）
 
 struct LGGlassCapsule<Content: View>: View {
+    var dark = false
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -217,15 +226,17 @@ struct LGGlassCapsule<Content: View>: View {
             .padding(.vertical, 11)
             .background {
                 Capsule().fill(.ultraThinMaterial)
-                Capsule().fill(Color.white.opacity(0.68))
+                Capsule().fill(dark ? Color(hex: 0x0D141E).opacity(0.72) : Color.white.opacity(0.68))
             }
             .overlay {
                 Capsule().strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.95), .white.opacity(0.3)],
+                    LinearGradient(colors: [.white.opacity(dark ? 0.22 : 0.95),
+                                            .white.opacity(dark ? 0.06 : 0.3)],
                                    startPoint: .top, endPoint: .bottom),
                     lineWidth: 1)
             }
-            .shadow(color: Color(hex: 0x1E2232).opacity(0.10), radius: 12, y: 8)
+            .shadow(color: dark ? Color.black.opacity(0.4) : Color(hex: 0x1E2232).opacity(0.10),
+                    radius: 12, y: 8)
     }
 }
 
@@ -233,6 +244,7 @@ struct LGGlassCapsule<Content: View>: View {
 
 struct LGRow: View {
     var icon: String?
+    var iconTint: Color? = nil
     let title: String
     let value: String
     var valueColor: Color = LG.sec
@@ -241,7 +253,17 @@ struct LGRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if let icon {
+            if let icon, let iconTint {
+                // 彩色徽章样式（r3/r4 设计稿：图标坐色块 tile）
+                Image(systemName: icon)
+                    .font(.system(.footnote, weight: .medium))
+                    .foregroundStyle(iconTint)
+                    .frame(width: 34, height: 34)
+                    .background {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(iconTint.opacity(0.12))
+                    }
+            } else if let icon {
                 Image(systemName: icon)
                     .font(.system(.subheadline, weight: .regular))
                     .foregroundStyle(Color(hex: 0x14161C).opacity(0.45))
@@ -267,7 +289,7 @@ struct LGRow: View {
                 Rectangle()
                     .fill(LG.hair)
                     .frame(height: 0.5)
-                    .padding(.leading, icon != nil ? 46 : 18)
+                    .padding(.leading, icon != nil ? (iconTint != nil ? 64 : 46) : 18)
             }
         }
         .contentShape(Rectangle())
@@ -324,12 +346,12 @@ struct LGPrimaryCTA: View {
             .frame(height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .strokeBorder(LG.grad, lineWidth: 2)
-                    .padding(-2)
+                RoundedRectangle(cornerRadius: 31.5, style: .continuous)
+                    .strokeBorder(LG.grad, lineWidth: 1.5)
+                    .padding(-1.5)
             }
-            .shadow(color: LG.gradTeal.opacity(0.38), radius: 18, y: 10)
-            .shadow(color: LG.gradLime.opacity(0.28), radius: 25, y: 16)
+            .shadow(color: LG.gradTeal.opacity(0.30), radius: 22, y: 10)
+            .shadow(color: LG.gradLime.opacity(0.22), radius: 30, y: 16)
         }
         .buttonStyle(.plain)
         .disabled(isBusy)
@@ -341,25 +363,27 @@ struct LGPrimaryCTA: View {
 struct LGRoundGlassButton: View {
     let systemName: String
     var tint: Color? = nil
+    var dark = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(.body, weight: .regular))
-                .foregroundStyle(tint ?? Color(hex: 0x14161C).opacity(0.45))
+                .foregroundStyle(tint ?? (dark ? Color.white.opacity(0.85) : Color(hex: 0x14161C).opacity(0.45)))
                 .frame(width: 58, height: 58)
                 .background {
                     Circle().fill(.ultraThinMaterial)
-                    Circle().fill(Color.white.opacity(0.72))
+                    Circle().fill(dark ? Color(hex: 0x0D141E).opacity(0.72) : Color.white.opacity(0.72))
                 }
                 .overlay {
                     Circle().strokeBorder(
-                        LinearGradient(colors: [.white, .white.opacity(0.3)],
+                        LinearGradient(colors: [.white.opacity(dark ? 0.25 : 1), .white.opacity(dark ? 0.06 : 0.3)],
                                        startPoint: .top, endPoint: .bottom),
                         lineWidth: 1)
                 }
-                .shadow(color: Color(hex: 0x1E2232).opacity(0.12), radius: 13, y: 10)
+                .shadow(color: dark ? Color.black.opacity(0.45) : Color(hex: 0x1E2232).opacity(0.12),
+                        radius: 13, y: 10)
         }
         .buttonStyle(.plain)
     }
@@ -370,19 +394,26 @@ struct LGRoundGlassButton: View {
 struct LGAvatarPlaceholder: View {
     let name: String
     var size: CGFloat = 42
+    var dark = false
 
     private var initial: String { String(name.prefix(1)) }
 
     var body: some View {
+        // 浅色屏：白底细边；夜航控制台：暗底绿环微光（r2 自由设计稿）
         Circle()
-            .fill(LG.gradSoft)
+            .fill(dark ? Color(hex: 0x0C141D) : Color.white)
             .overlay {
                 Text(initial)
                     .font(.system(size: size * 0.4, weight: .semibold))
                     .foregroundStyle(LG.gradGreen)
             }
-            .overlay { Circle().strokeBorder(Color.white.opacity(0.8), lineWidth: 1) }
+            .overlay {
+                Circle().strokeBorder(
+                    dark ? LG.gradGreen.opacity(0.55) : Color(hex: 0x14161C).opacity(0.10),
+                    lineWidth: dark ? 1.5 : 1)
+            }
             .frame(width: size, height: size)
-            .shadow(color: Color(hex: 0x1E2232).opacity(0.14), radius: 4, y: 2)
+            .shadow(color: dark ? LG.gradGreen.opacity(0.25) : Color(hex: 0x1E2232).opacity(0.08),
+                    radius: dark ? 5 : 3, y: dark ? 0 : 2)
     }
 }
