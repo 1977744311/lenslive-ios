@@ -1,0 +1,53 @@
+# XcodeGen 工程定义：`xcodegen generate` 产出 LensLive.xcodeproj
+# App target 挂真实 SDK（MWDAT + HaishinKit）；库层（LensLiveKit）零第三方依赖。
+name: LensLive
+options:
+  bundleIdPrefix: dev.steven
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  LensLiveKit:
+    path: .
+  MWDAT:
+    url: https://github.com/facebook/meta-wearables-dat-ios
+    from: 0.8.0
+  HaishinKit:
+    url: https://github.com/HaishinKit/HaishinKit.swift
+    from: 2.2.5
+targets:
+  LensLive:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - package: LensLiveKit
+        products:
+          - DanmakuCore
+          - GlassesKit
+          - GlassRenderer
+          - StreamEngine
+          - AudioHub
+          - LensLiveCore
+      - package: MWDAT
+      - package: HaishinKit
+        products:
+          - HaishinKit
+          - RTMPHaishinKit
+    info:
+      path: App/Support/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: 直播需要使用麦克风采集声音。
+        NSCameraUsageDescription: 预览与直播需要访问相机画面。
+        NSBluetoothAlwaysUsageDescription: 连接 Meta Ray-Ban Display 眼镜需要蓝牙。
+        NSLocalNetworkUsageDescription: 向局域网直播姬推流需要访问本地网络。
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        MWDAT:
+          DAMEnabled: true
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
