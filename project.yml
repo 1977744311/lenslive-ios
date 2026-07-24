@@ -30,6 +30,11 @@ targets:
           - AudioHub
           - LensLiveCore
       - package: MWDAT
+        products:
+          - MWDATCore
+          - MWDATCamera
+          - MWDATDisplay
+          - MWDATMockDevice
       - package: HaishinKit
         products:
           - HaishinKit

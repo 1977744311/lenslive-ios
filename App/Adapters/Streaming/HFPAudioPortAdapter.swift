@@ -76,10 +76,12 @@ public final class HFPAudioPortAdapter: AudioPortControlling, @unchecked Sendabl
     }
 
     public func teardown() async {
-        lock.lock()
-        let hadTap = tapInstalled
-        tapInstalled = false
-        lock.unlock()
+        // async 上下文禁止裸 lock/unlock，withLock 是同步作用域调用可以过检查
+        let hadTap = lock.withLock {
+            let value = tapInstalled
+            tapInstalled = false
+            return value
+        }
         if hadTap {
             engine.inputNode.removeTap(onBus: 0)
         }

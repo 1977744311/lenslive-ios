@@ -69,12 +69,12 @@ public actor HaishinKitPipelineAdapter: StreamPipelining {
         video.videoSize = CGSize(width: CGFloat(preset.width), height: CGFloat(preset.height))
         video.bitRate = preset.videoBitrateBps
         video.maxKeyFrameIntervalDuration = 2
-        await stream.setVideoSettings(video)
+        try await stream.setVideoSettings(video)
 
         // AAC 128kbps；HFP 源实际 8kHz 单声道由采集侧决定，编码参数不变（重采样在编码器内完成）
         var audio = AudioCodecSettings()
         audio.bitRate = preset.audioBitrateBps
-        await stream.setAudioSettings(audio)
+        try await stream.setAudioSettings(audio)
 
         // 断连观察：publish 成功后服务端断开不会以 throw 形式出现，
         // 只能从 connection.status 收 NetConnection.Connect.Closed/Failed（HaishinKit #1584）
@@ -117,10 +117,13 @@ public actor HaishinKitPipelineAdapter: StreamPipelining {
     /// GlassesKit 相机帧入口：载荷强转 CMSampleBuffer 后透传 mixer（manual+passthrough）。
     public func appendVideoPayload(_ payload: any Sendable, timestampSeconds: Double) async {
         lastFrameTimestamp = timestampSeconds
-        guard let sampleBuffer = payload as? CMSampleBuffer else {
+        // CF 类型不能用 as? 条件转换（编译器判定恒成立），走 CFGetTypeID 判别
+        let object = payload as AnyObject
+        guard CFGetTypeID(object) == CMSampleBufferGetTypeID() else {
             aggregator.recordDropped(at: timestampSeconds)
             return
         }
+        let sampleBuffer = object as! CMSampleBuffer
         aggregator.recordFrame(bytes: CMSampleBufferGetTotalSampleSize(sampleBuffer),
                                at: timestampSeconds)
         await mixer.append(sampleBuffer)

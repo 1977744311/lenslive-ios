@@ -3,33 +3,22 @@
 // ⚠️ 真机验证项见研究文档 §7（steven-ai-lab 任务目录 research-live-danmaku.md 第 7 节）：
 //    同会话 addStream+addDisplay 共存、休眠中 send 行为、1Hz send 稳定性、热/续航曲线等。
 //
-// ── API 映射假设（依据 display-capabilities.md@2026-07-24，集成时逐条对照 SDK 核验）──
-//  A1  入口：`Wearables.configure()` 幂等初始化（DAM 模型由 Info.plist `MWDAT.DAMEnabled` 开启）；
-//      设备发现走 `AutoDeviceSelector`，以 `Device.supportsDisplay()` 过滤 Display 机型。
-//  A2  会话：`Wearables.shared.createSession(for:)` → `DeviceSession`；`session.start()/stop()`；
-//      状态流假设为 `session.stateStream: AsyncStream<DeviceSessionState>`（文档只确认"可观察"）。
-//  A3  相机：`session.addStream(StreamConfiguration)` 返回流能力对象；
-//      `StreamConfiguration(resolution:frameRate:videoCodec: .raw)`（研究文档 §8.1：VideoFrame 自带
-//      raw CMSampleBuffer）；帧流假设为 `stream.frames: AsyncStream<VideoFrame>`。
-//  A4  屏显：`session.addDisplay(DisplayConfiguration())` 返回 display 能力对象；0.8.0 iOS
-//      `display.start()/stop()` 为同步；发送为 `display.send(_:)`（iOS 名，Android 为 sendContent）；
-//      0.8.0 新增 `display.clearDisplay()`。
-//  A5  组件：`MWDATDisplay.FlexBox/Text/Button/Image/Icon`（与 SwiftUI 同名冲突，故本文件不 import
-//      SwiftUI 并全程 MWDATDisplay. 限定）；文本 3 样式 heading/body/meta × 2 色 primary/secondary；
-//      FlexBox 支持 direction/gap/alignment/crossAlignment/逐边 padding/onClick。
-//  A6  枚举拼写：假设 Swift 侧为 lowerCamel（.column/.row、.start/.center/.end/.stretch、
-//      .heading/.body/.meta、.primary/.secondary）；Padding 假设有 `Padding(all:)` 便捷构造。
-//  A7  Icon：契约 9 个图标名假设与官方 icon catalog 同名（catalog 100+，需逐个核对；
-//      对不上的用自定义 Image 兜底——见 translateIcon TODO）。
-//  A8  交互：captouch 单指 tap 以组件 onClick 回调抽象（无全局 tap 流）；本适配器把任何
-//      onClick 归一为 captouch .tap + displayActions(actionID) 两条流。back 手势无独立回调：
-//      L0 上 back 直接结束 display 会话 → 以"display 意外 stopped 且 session 仍 started"
-//      启发式合成 .backOnRoot（需真机核验，见 TODO）。
-//  A9  健康：`Wearables.shared.deviceStateStream(for:)` 暴露 ThermalLevel（normal/warm/hot/critical
-//      拼写待核）；会话级错误流假设为 `session.errors: AsyncStream<DeviceSessionError>`，其中
-//      THERMAL_CRITICAL/BATTERY_CRITICAL/PEAK_POWER_SHUTDOWN/DAT_APP_..._UPDATE_REQUIRED 映射契约故障。
-//  A10 错误：`DisplayError.deviceDisconnected/.connectionNotAvailable/.deviceNotFound` 归为断连
-//      （GlassesSessionError.notConnected → DisplayDispatcher 缓存重发）；其余归渲染/未知（丢帧）。
+// ── 0.8.0 真实 API 与契约的能力差距（对照各 xcframework 的 arm64-apple-ios.swiftinterface）──
+//  · 设备发现没有独立"选择"调用：AutoDeviceSelector 直接注入 createSession(deviceSelector:)，
+//    会话自行等待设备；活跃设备经 selector.activeDeviceStream() 跟随，热观测随之切换。
+//  · session/stream/display 的 start·stop 均为同步，状态经 stateStream()/statePublisher 回流；
+//    仅 display.send/clearDisplay 为 async throws。相机/显示能力对象为 Stream/Display，
+//    事件走 Announcer.listen（token 取消），此处统一桥成 AsyncStream 消费。
+//  · 相机分辨率是预设枚举（StreamingResolution high/medium/low），与契约 CameraPreset.pixelSize
+//    三档规格一致，按 quality 直接映射；帧载荷 VideoFrame.sampleBuffer 即 raw CMSampleBuffer。
+//  · 组件树：FlexBox/Text/Button/Icon/Image 皆 ViewComponent，但 display.send 只收
+//    DisplayableView（FlexBox/VideoPlayer）——非 FlexBox 根节点需包一层 FlexBox。
+//    契约 gap→spacing、padding(Int)→EdgeInsets(all:)；FlexBox.onClick 只读，可点击用 .onTap。
+//  · captouch：SDK 无全局手势流，组件 onTap 归一为 .tap + displayActions(actionID) 两条流；
+//    back 手势无独立回调：L0 上 back 直接结束 display 会话 → 以"display 意外 stopped 且
+//    session 仍 started"启发式合成 .backOnRoot（需真机核验）。
+//  · ThermalLevel 为 8 档（unknown…shutdown），契约 4 档，做区间归并。
+//  · 0.8.0 图标目录无 gift/warning，用 shoppingBag/exclamationTriangle 近似。
 #if canImport(MWDATCore) && canImport(MWDATDisplay) && canImport(MWDATCamera)
 import Foundation
 import CoreMedia
@@ -51,9 +40,9 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     // MARK: - 扇出总线（与 Mock 同一套基础设施）
 
     private let sessionBus = StreamBroadcaster<GlassesSessionState>(replaysLatest: true)
-    private let displayBus = StreamBroadcaster<DisplayState>(replaysLatest: true)
+    private let displayBus = StreamBroadcaster<GlassesKit.DisplayState>(replaysLatest: true)
     private let cameraBus = StreamBroadcaster<CameraStreamState>(replaysLatest: true)
-    private let thermalBus = StreamBroadcaster<ThermalLevel>(replaysLatest: true)
+    private let thermalBus = StreamBroadcaster<GlassesKit.ThermalLevel>(replaysLatest: true)
     private let faultBus = StreamBroadcaster<GlassesFault>()
     private let captouchBus = StreamBroadcaster<CaptouchGesture>()
     private let frameBus = StreamBroadcaster<CameraFramePacket>()
@@ -62,17 +51,19 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
 
     // MARK: - SDK 句柄
 
-    private var device: Device?
+    private var deviceSelector: AutoDeviceSelector?
     private var session: DeviceSession?
-    private var cameraStream: CameraStreamCapability?
-    private var display: DisplayCapability?
+    private var cameraStream: MWDATCamera.Stream?
+    private var display: MWDATDisplay.Display?
 
     private var observationTasks: [Task<Void, Never>] = []
-    private var frameTask: Task<Void, Never>?
+    private var thermalTask: Task<Void, Never>?
+    private var displayTask: Task<Void, Never>?
+    private var cameraTasks: [Task<Void, Never>] = []
     private var frameSequence: UInt64 = 0
 
     private var lastKnownSessionState: GlassesSessionState = .idle
-    private var lastKnownDisplayState: DisplayState = .stopped
+    private var lastKnownDisplayState: GlassesKit.DisplayState = .stopped
     private var displayDetachRequested = false
 
     public init() {}
@@ -80,9 +71,9 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     // MARK: - GlassesSessionProviding：流
 
     public nonisolated var sessionStates: AsyncStream<GlassesSessionState> { sessionBus.subscribe() }
-    public nonisolated var displayStates: AsyncStream<DisplayState> { displayBus.subscribe() }
+    public nonisolated var displayStates: AsyncStream<GlassesKit.DisplayState> { displayBus.subscribe() }
     public nonisolated var cameraStates: AsyncStream<CameraStreamState> { cameraBus.subscribe() }
-    public nonisolated var thermal: AsyncStream<ThermalLevel> { thermalBus.subscribe() }
+    public nonisolated var thermal: AsyncStream<GlassesKit.ThermalLevel> { thermalBus.subscribe() }
     public nonisolated var faults: AsyncStream<GlassesFault> { faultBus.subscribe() }
     public nonisolated var captouch: AsyncStream<CaptouchGesture> { captouchBus.subscribe() }
     public nonisolated var cameraFrames: AsyncStream<CameraFramePacket> { frameBus.subscribe() }
@@ -95,24 +86,24 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
 
     public func start() async throws {
         guard session == nil else { return }
-        // A1：初始化 + 设备发现（仅 Display 机型）
-        Wearables.configure()
-        let selector = AutoDeviceSelector(filter: { candidate in candidate.supportsDisplay() })
-        let device: Device
+        // configure 幂等化：重复初始化抛 alreadyConfigured，视为已就绪
         do {
-            device = try await selector.selectDevice()
+            try Wearables.configure()
+        } catch WearablesError.alreadyConfigured {
         } catch {
-            throw GlassesSessionError.notConnected
+            throw GlassesSessionError.underlying(String(describing: error))
         }
-        self.device = device
-
-        // A2：建会话并启动
+        // 仅 Display 机型；selector 交给会话托管设备等待/切换
+        let selector = AutoDeviceSelector(wearables: Wearables.shared) { candidate in
+            candidate.supportsDisplay()
+        }
+        deviceSelector = selector
         do {
-            let session = try await Wearables.shared.createSession(for: device)
+            let session = try Wearables.shared.createSession(deviceSelector: selector)
             self.session = session
-            try await session.start()
+            try session.start()
             observeSession(session)
-            observeDeviceState(device)
+            observeThermal(following: selector)
         } catch {
             self.session = nil
             throw mapSessionError(error)
@@ -120,15 +111,18 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     }
 
     public func stop() async {
-        stopFrameObservation()
+        stopCameraObservation()
+        stopDisplayObservation()
+        thermalTask?.cancel()
+        thermalTask = nil
         for task in observationTasks { task.cancel() }
         observationTasks = []
-        if let display { try? display.stop() }
+        display?.stop()
         display = nil
         cameraStream = nil
-        if let session { await session.stop() }
+        session?.stop()
         session = nil
-        device = nil
+        deviceSelector = nil
         publishSession(.stopped)
     }
 
@@ -138,31 +132,34 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         guard let session else { throw GlassesSessionError.sessionNotStarted }
         guard cameraStream == nil else { return }
         publishCamera(.waitingForDevice)
-        // A3：raw codec（研究文档 §8.1——直接 CMSampleBuffer 入 HaishinKit mixer，无重解码）
-        let size = preset.pixelSize
+        // raw codec（研究文档 §8.1——直接 CMSampleBuffer 入 HaishinKit mixer，无重解码）
         let configuration = StreamConfiguration(
-            resolution: StreamConfiguration.Resolution(width: size.width, height: size.height),
-            frameRate: preset.frameRate,
-            videoCodec: .raw
+            videoCodec: .raw,
+            resolution: mapResolution(preset.quality),
+            frameRate: UInt(preset.frameRate)
         )
+        let stream: MWDATCamera.Stream?
         do {
-            let stream = try await session.addStream(configuration)
-            cameraStream = stream
-            try await stream.start()
-            publishCamera(.streaming)
-            observeFrames(of: stream)
+            stream = try session.addStream(config: configuration)
         } catch {
             publishCamera(.stopped)
             throw mapSessionError(error)
         }
+        guard let stream else {
+            publishCamera(.stopped)
+            // 0.8.0 接口未定义 addStream 返回 nil 的语义，按设备不可达处理
+            throw GlassesSessionError.notConnected
+        }
+        cameraStream = stream
+        observeCamera(stream)
+        stream.start()   // 同步；后续状态（starting→streaming）经 statePublisher 回流
     }
 
     public func detachCamera() async {
-        stopFrameObservation()
+        stopCameraObservation()
         if let cameraStream {
             publishCamera(.stopping)
-            try? await cameraStream.stop()
-            // 0.8.0 capability 生命周期简化：Closeable / stop() 即从会话移除
+            cameraStream.stop()
         }
         cameraStream = nil
         publishCamera(.stopped)
@@ -175,22 +172,24 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         guard display == nil else { return }
         displayDetachRequested = false
         do {
-            // A4：一个 session 同时只能挂一个 display capability（先 remove 再 add 由上层保证）
-            let display = try await session.addDisplay(DisplayConfiguration())
+            // 一个 session 同时只能挂一个 display capability（先 remove 再 add 由上层保证）
+            let display = try session.addDisplay()
             self.display = display
-            try display.start()   // 0.8.0 iOS 同步
             observeDisplay(display)
+            display.start()   // 同步；状态经 statePublisher 回流
         } catch {
             self.display = nil
-            throw mapDisplayError(error)
+            // addDisplay 抛的是会话级 DeviceSessionError（capabilityAlreadyActive 等）
+            throw mapSessionError(error)
         }
     }
 
     public func detachDisplay() async {
         displayDetachRequested = true
+        stopDisplayObservation()
         if let display {
             publishDisplay(.stopping)
-            try? display.stop()
+            display.stop()
         }
         display = nil
         publishDisplay(.stopped)
@@ -206,9 +205,11 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
             throw GlassesSessionError.rendering("payload 解码失败: \(error)")
         }
         let root = translate(node)
+        // send 只接受 DisplayableView（FlexBox/VideoPlayer）；非 FlexBox 根节点包一层
+        let rootBox = root as? MWDATDisplay.FlexBox ?? MWDATDisplay.FlexBox { root }
         do {
-            // A4：send 为整屏替换；20s 变暗/25s 休眠不结束会话，唤醒后可复用旧内容
-            try await display.send(root)
+            // send 为整屏替换；20s 变暗/25s 休眠不结束会话，唤醒后可复用旧内容
+            try await display.send(rootBox)
         } catch {
             throw mapDisplayError(error)
         }
@@ -217,7 +218,7 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     public func clearDisplay() async throws {
         guard let display else { throw GlassesSessionError.displayNotAttached }
         do {
-            try await display.clearDisplay()   // 0.8.0 新增
+            try await display.clearDisplay()
         } catch {
             throw mapDisplayError(error)
         }
@@ -225,21 +226,23 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
 
     // MARK: - GlassNode → MWDATDisplay 组件翻译
 
-    /// 契约布局树与 DAT FlexBox DSL 同构，逐节点直译。
-    /// A5/A6：组件构造器签名与枚举拼写为假设，集成时以 SDK 头文件为准。
-    private func translate(_ node: GlassNode) -> MWDATDisplay.Component {
+    /// 契约布局树与 DAT FlexBox DSL 同构，逐节点直译
+    /// （children 经 ComponentBuilder 的 for-in/buildArray 注入）。
+    private func translate(_ node: GlassNode) -> any MWDATDisplay.ViewComponent {
         switch node {
         case let .flexBox(props, children):
+            let translated = children.map { translate($0) }
             var box = MWDATDisplay.FlexBox(
                 direction: translateDirection(props.direction),
-                gap: props.gap,
+                spacing: CGFloat(props.gap),
                 alignment: translateAlignment(props.alignment),
                 crossAlignment: translateAlignment(props.crossAlignment),
-                padding: MWDATDisplay.Padding(all: props.padding),
-                children: children.map { translate($0) }
-            )
+                padding: MWDATDisplay.EdgeInsets(all: CGFloat(props.padding))
+            ) {
+                for child in translated { child }
+            }
             if let actionID = props.actionID {
-                box.onClick = makeClickHandler(actionID: actionID)
+                box = box.onTap(makeClickHandler(actionID: actionID))
             }
             return box
 
@@ -251,8 +254,7 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
             )
 
         case let .image(url):
-            // A5：Image 仅支持 URL 加载；尺寸预设 ICON/FILL、圆角 NONE/SMALL/MEDIUM
-            return MWDATDisplay.Image(url: url, size: .fill, cornerRadius: .none)
+            return MWDATDisplay.Image(uri: url, sizePreset: .fill, cornerRadius: .none)
 
         case let .button(label, style, actionID):
             return MWDATDisplay.Button(
@@ -266,7 +268,7 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         }
     }
 
-    /// A8：任何组件点击 → captouch .tap（契约手势流）+ actionID（补充流）
+    /// 任何组件点击 → captouch .tap（契约手势流）+ actionID（补充流）
     private func makeClickHandler(actionID: String) -> @Sendable () -> Void {
         let captouchBus = self.captouchBus
         let actionBus = self.actionBus
@@ -276,14 +278,14 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         }
     }
 
-    private func translateDirection(_ direction: GlassDirection) -> MWDATDisplay.FlexDirection {
+    private func translateDirection(_ direction: GlassDirection) -> MWDATDisplay.Direction {
         switch direction {
         case .column: return .column
         case .row: return .row
         }
     }
 
-    private func translateAlignment(_ alignment: GlassAlignment) -> MWDATDisplay.FlexAlignment {
+    private func translateAlignment(_ alignment: GlassAlignment) -> MWDATDisplay.Alignment {
         switch alignment {
         case .start: return .start
         case .center: return .center
@@ -315,8 +317,6 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         }
     }
 
-    /// A7 TODO(集成)：逐个核对官方 icon catalog（/docs/develop/dat/display-icons）命名；
-    /// 目录里没有的用自定义 Image 兜底。
     private func translateIcon(_ name: GlassIconName) -> MWDATDisplay.IconName {
         switch name {
         case .checkmarkCircle: return .checkmarkCircle
@@ -326,24 +326,35 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         case .star: return .star
         case .arrowLeft: return .arrowLeft
         case .arrowRight: return .arrowRight
-        case .gift: return .gift
-        case .warning: return .warning
+        case .gift: return .shoppingBag               // 0.8.0 无 gift，用 shoppingBag 近似
+        case .warning: return .exclamationTriangle    // 0.8.0 无 warning，用 exclamationTriangle 近似
         }
     }
 
     // MARK: - SDK 状态观察
 
+    /// Announcer（listen/token 回调）→ AsyncStream；流终止时异步取消订阅 token
+    private func makeStream<T: Sendable>(from announcer: any Announcer<T>) -> AsyncStream<T> {
+        AsyncStream { continuation in
+            let token = announcer.listen { value in
+                continuation.yield(value)
+            }
+            continuation.onTermination = { _ in
+                Task { await token.cancel() }
+            }
+        }
+    }
+
     private func observeSession(_ session: DeviceSession) {
-        // A2：会话状态流
-        let states = session.stateStream
+        let states = session.stateStream()
         observationTasks.append(Task { [weak self] in
             for await state in states {
                 guard let self else { return }
                 await self.handleSessionState(state)
             }
         })
-        // A9：会话级错误 → 契约故障
-        let errors = session.errors
+        // 会话级错误（热/电/DAT app 版本等）→ 契约故障
+        let errors = session.errorStream()
         observationTasks.append(Task { [weak self] in
             for await error in errors {
                 guard let self else { return }
@@ -352,41 +363,66 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         })
     }
 
-    private func observeDeviceState(_ device: Device) {
-        // A9：设备健康（ThermalLevel）
-        let states = Wearables.shared.deviceStateStream(for: device)
+    /// 设备健康（ThermalLevel）挂在设备标识符上；AutoDeviceSelector 切换设备时跟随重挂
+    private func observeThermal(following selector: AutoDeviceSelector) {
+        let deviceIDs = selector.activeDeviceStream()
         observationTasks.append(Task { [weak self] in
+            for await deviceID in deviceIDs {
+                guard let self else { return }
+                await self.restartThermalObservation(deviceID)
+            }
+        })
+    }
+
+    private func restartThermalObservation(_ deviceID: DeviceIdentifier?) {
+        thermalTask?.cancel()
+        thermalTask = nil
+        guard let deviceID else { return }
+        let states = Wearables.shared.deviceStateStream(for: deviceID)
+        thermalTask = Task { [weak self] in
             for await state in states {
                 guard let self else { return }
                 await self.publishThermal(self.mapThermal(state.thermalLevel))
             }
-        })
+        }
     }
 
-    private func observeDisplay(_ display: DisplayCapability) {
-        let states = display.stateStream
-        observationTasks.append(Task { [weak self] in
+    private func observeDisplay(_ display: MWDATDisplay.Display) {
+        let states = makeStream(from: display.statePublisher)
+        displayTask = Task { [weak self] in
             for await state in states {
                 guard let self else { return }
                 await self.handleDisplayState(state)
             }
-        })
+        }
     }
 
-    private func observeFrames(of stream: CameraStreamCapability) {
-        // A3：帧流；sequence 由适配器自编号（契约只要求单调）
-        let frames = stream.frames
-        frameTask = Task { [weak self] in
+    private func observeCamera(_ stream: MWDATCamera.Stream) {
+        let states = makeStream(from: stream.statePublisher)
+        cameraTasks.append(Task { [weak self] in
+            for await state in states {
+                guard let self else { return }
+                await self.publishCamera(self.mapCameraState(state))
+            }
+        })
+        // 帧流；sequence 由适配器自编号（契约只要求单调）
+        let frames = makeStream(from: stream.videoFramePublisher)
+        cameraTasks.append(Task { [weak self] in
             for await frame in frames {
                 guard let self else { return }
                 await self.publishFrame(frame)
             }
-        }
+        })
     }
 
-    private func stopFrameObservation() {
-        frameTask?.cancel()
-        frameTask = nil
+    private func stopCameraObservation() {
+        for task in cameraTasks { task.cancel() }
+        cameraTasks = []
+    }
+
+    private func stopDisplayObservation() {
+        displayTask?.cancel()
+        displayTask = nil
     }
 
     // MARK: - 状态/事件处理
@@ -407,7 +443,7 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
 
     private func handleDisplayState(_ state: MWDATDisplay.DisplayState) {
         let mapped = mapDisplayState(state)
-        // A8 TODO(真机核验)：back 手势在 L0 结束 display 会话且 SDK 无独立回调——
+        // TODO(真机核验)：back 手势在 L0 结束 display 会话且 SDK 无独立回调——
         // 以"非主动 detach、session 仍 started 时 display 走向 stopped"合成 .backOnRoot
         if mapped == .stopped, !displayDetachRequested, lastKnownSessionState == .started,
            lastKnownDisplayState == .started {
@@ -418,10 +454,11 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     }
 
     private func handleSessionError(_ error: DeviceSessionError) {
-        faultBus.send(mapSessionFault(error))
+        guard let fault = mapSessionFault(error) else { return }
+        faultBus.send(fault)
     }
 
-    private func publishFrame(_ frame: VideoFrame) {
+    private func publishFrame(_ frame: MWDATCamera.VideoFrame) {
         frameSequence += 1
         frameBus.send(CameraFramePacket(
             sequence: frameSequence,
@@ -431,9 +468,9 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     }
 
     private func publishSession(_ state: GlassesSessionState) { sessionBus.send(state) }
-    private func publishDisplay(_ state: DisplayState) { displayBus.send(state) }
+    private func publishDisplay(_ state: GlassesKit.DisplayState) { displayBus.send(state) }
     private func publishCamera(_ state: CameraStreamState) { cameraBus.send(state) }
-    private func publishThermal(_ level: ThermalLevel) { thermalBus.send(level) }
+    private func publishThermal(_ level: GlassesKit.ThermalLevel) { thermalBus.send(level) }
 
     // MARK: - SDK ↔ 契约映射
 
@@ -445,40 +482,70 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         case .paused: return .paused
         case .stopping: return .stopping
         case .stopped: return .stopped
-        @unknown default: return .stopped
         }
     }
 
-    private func mapDisplayState(_ state: MWDATDisplay.DisplayState) -> DisplayState {
+    private func mapDisplayState(_ state: MWDATDisplay.DisplayState) -> GlassesKit.DisplayState {
         switch state {
         case .stopped: return .stopped
         case .starting: return .starting
         case .started: return .started
         case .stopping: return .stopping
-        @unknown default: return .stopped
         }
     }
 
-    private func mapThermal(_ level: MWDATCore.ThermalLevel) -> ThermalLevel {
+    private func mapCameraState(_ state: MWDATCamera.StreamState) -> CameraStreamState {
+        switch state {
+        case .stopped: return .stopped
+        case .waitingForDevice: return .waitingForDevice
+        case .starting: return .starting
+        case .streaming: return .streaming
+        case .paused: return .paused
+        case .stopping: return .stopping
+        }
+    }
+
+    /// 契约 pixelSize 三档（720×1280/504×896/360×640）与 SDK 预设枚举一致，按 quality 直映
+    private func mapResolution(_ quality: CameraPreset.Quality) -> MWDATCamera.StreamingResolution {
+        switch quality {
+        case .high: return .high
+        case .medium: return .medium
+        case .low: return .low
+        }
+    }
+
+    /// SDK 8 档 → 契约 4 档区间归并
+    private func mapThermal(_ level: MWDATCore.ThermalLevel) -> GlassesKit.ThermalLevel {
         switch level {
-        case .normal: return .normal
-        case .warm: return .warm
-        case .hot: return .hot
-        case .critical: return .critical
-        @unknown default: return .critical
+        case .unknown, .none: return .normal
+        case .light, .moderate: return .warm
+        case .severe: return .hot
+        case .critical, .emergency, .shutdown: return .critical
         }
     }
 
-    private func mapSessionFault(_ error: DeviceSessionError) -> GlassesFault {
+    /// 会话错误流 → 契约故障；API 使用类错误（session*/capability*）不是运行时故障，返回 nil 不上报
+    private func mapSessionFault(_ error: DeviceSessionError) -> GlassesFault? {
         switch error {
-        case .thermalCritical, .thermalEmergency: return .thermal(.critical)
-        case .batteryCritical, .peakPowerShutdown: return .batteryCritical
-        case .datAppOnTheGlassesUpdateRequired: return .datAppUpdateRequired
-        @unknown default: return .bluetoothLost
+        case .thermalCritical, .thermalEmergency:
+            return .thermal(.critical)
+        case .batteryCritical, .peakPowerShutdown:
+            return .batteryCritical
+        case .datAppOnTheGlassesUpdateRequired, .dwaUnavailable:
+            // dwaUnavailable：眼镜端 DAT app 不可用，与"需要更新"同一处置路径
+            return .datAppUpdateRequired
+        case .noEligibleDevice:
+            return .bluetoothLost
+        case .unexpectedError:
+            // 无更细分类：按断连交给重连管理器兜底
+            return .bluetoothLost
+        case .sessionAlreadyStopped, .sessionAlreadyExists, .sessionIdle,
+             .capabilityAlreadyActive, .capabilityNotFound:
+            return nil
         }
     }
 
-    /// A10：display 错误分类——断连类进 GlassesSessionError.notConnected
+    /// display 错误分类——断连类进 GlassesSessionError.notConnected
     /// （DisplayDispatcher 据 isDisconnection 缓存待重挂重发），其余按渲染失败丢帧。
     private func mapDisplayError(_ error: any Error) -> GlassesSessionError {
         if let displayError = error as? MWDATDisplay.DisplayError {
@@ -499,10 +566,15 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     private func mapSessionError(_ error: any Error) -> GlassesSessionError {
         if let sessionError = error as? DeviceSessionError {
             switch sessionError {
-            case .capabilityDenied: return .capabilityDenied
-            case .deviceDisconnected: return .notConnected
-            case .invalidSessionState: return .sessionNotStarted
-            @unknown default: return .underlying(String(describing: sessionError))
+            case .noEligibleDevice:
+                return .notConnected
+            case .sessionIdle, .sessionAlreadyStopped:
+                return .sessionNotStarted
+            case .thermalCritical, .thermalEmergency, .batteryCritical, .peakPowerShutdown,
+                 .datAppOnTheGlassesUpdateRequired, .dwaUnavailable,
+                 .sessionAlreadyExists, .capabilityAlreadyActive, .capabilityNotFound,
+                 .unexpectedError:
+                return .underlying(String(describing: sessionError))
             }
         }
         return .underlying(String(describing: error))
