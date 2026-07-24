@@ -4,7 +4,7 @@
 
 - 平台：iOS 17+ · Swift 6 · SwiftUI
 - 设计与需求：见任务仓库 `steven-ai-lab/tasks/2026-07-24-meta-display-眼镜原生-app-开发与最新-sdk-能力调研/`（PRD、架构、定稿 mockup 画布）
-- 状态：M0（无真机可跑的全量代码 + Mock 联调）；真机验证清单见研究文档 §7
+- 状态：M0 完成——真实 SDK（MWDAT 0.8.0 + HaishinKit 2.2.5）已解析，App 全编译 BUILD SUCCEEDED，142 单测全绿；差真机验证（清单见研究文档 §7）。依赖拉取不稳时用 `Tools/fetch-deps.sh` 走镜像重试
 
 ## 架构
 
