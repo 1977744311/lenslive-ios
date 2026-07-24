@@ -96,15 +96,16 @@ struct HomeScreen: View {
 
     private var configCard: some View {
         VStack(spacing: 0) {
-            NavigationLink {
-                TargetsScreen()
+            // 跳转到对应 Tab 而非 push 副本，避免同屏双导航路径
+            Button {
+                store.selectedTab = .targets
             } label: {
                 LGRow(icon: "target", title: "推流目标", value: store.selectedTarget.name)
             }
             .buttonStyle(.plain)
 
-            NavigationLink {
-                DanmakuSettingsScreen()
+            Button {
+                store.selectedTab = .danmaku
             } label: {
                 LGRow(icon: "bubble.left", title: "弹幕源", value: "B 站 · 已绑定")
             }

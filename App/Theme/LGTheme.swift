@@ -329,13 +329,14 @@ struct LGPrimaryCTA: View {
 
 struct LGRoundGlassButton: View {
     let systemName: String
+    var tint: Color? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(Color(hex: 0x14161C).opacity(0.45))
+                .foregroundStyle(tint ?? Color(hex: 0x14161C).opacity(0.45))
                 .frame(width: 58, height: 58)
                 .background {
                     Circle().fill(.ultraThinMaterial)

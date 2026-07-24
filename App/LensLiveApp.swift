@@ -24,17 +24,25 @@ struct LensLiveApp: App {
 
 // MARK: - 根视图：三 Tab + 直播中全屏控制台
 
+enum RootTab: Hashable {
+    case home, targets, danmaku
+}
+
 struct RootView: View {
     @Environment(LiveSessionStore.self) private var store
 
     var body: some View {
-        TabView {
+        @Bindable var store = store
+        TabView(selection: $store.selectedTab) {
             NavigationStack { HomeScreen() }
                 .tabItem { Label("首页", systemImage: "eyeglasses") }
+                .tag(RootTab.home)
             NavigationStack { TargetsScreen() }
                 .tabItem { Label("推流目标", systemImage: "dot.radiowaves.left.and.right") }
+                .tag(RootTab.targets)
             NavigationStack { DanmakuSettingsScreen() }
                 .tabItem { Label("弹幕", systemImage: "bubble.left.and.bubble.right") }
+                .tag(RootTab.danmaku)
         }
         .fullScreenCover(isPresented: consolePresented) {
             ConsoleScreen()
@@ -79,6 +87,9 @@ final class LiveSessionStore {
 
     // 快照（Coordinator 输出流驱动）
     private(set) var snapshot: LiveSessionSnapshot = .initial
+
+    // 根 Tab 选中态（首页配置行作跳转入口，避免与 Tab 重复导航）
+    var selectedTab: RootTab = .home
 
     // 配置态（开播前的选择；开播后以快照为准）
     private(set) var targets: [RTMPTarget]

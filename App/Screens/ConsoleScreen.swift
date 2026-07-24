@@ -9,13 +9,18 @@ struct ConsoleScreen: View {
     @Environment(LiveSessionStore.self) private var store
     @State private var showEndConfirm = false
     @State private var dismissedNoticeID = 0
+    @State private var previewCollapsed = false
 
     var body: some View {
         VStack(spacing: 0) {
             statusBar
                 .padding(.bottom, 14)
 
-            viewfinder
+            if previewCollapsed {
+                collapsedStatsBar
+            } else {
+                viewfinder
+            }
 
             noticeBanner
 
@@ -123,6 +128,23 @@ struct ConsoleScreen: View {
         .padding(.horizontal, 2)
     }
 
+    /// 预览收起态：保留推流监控指标的紧凑条（腾出屏幕给弹幕流）
+    private var collapsedStatsBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "video.slash")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.55))
+            statChip(statBitrate)
+            statChip(statFps)
+            statChip(store.snapshot.stats?.networkGood == false ? "网络 波动" : "网络 良好")
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(Capsule().fill(Color.black.opacity(0.86)))
+        .padding(.horizontal, 2)
+    }
+
     private var statBitrate: String {
         guard let stats = store.snapshot.stats else { return "-- Mbps" }
         return String(format: "%.1f Mbps", stats.bitrateMbps)
@@ -204,8 +226,11 @@ struct ConsoleScreen: View {
 
     private var dock: some View {
         HStack(spacing: 14) {
-            LGRoundGlassButton(systemName: "video") {
-                // 预留：切换预览/画质快捷位（mockup cam 键）
+            // 收起/展开 POV 预览（收起后弹幕流占满，指标条仍在）
+            LGRoundGlassButton(systemName: previewCollapsed ? "video.slash" : "video") {
+                withAnimation(.spring(duration: 0.35)) {
+                    previewCollapsed.toggle()
+                }
             }
             Button {
                 showEndConfirm = true
@@ -226,13 +251,30 @@ struct ConsoleScreen: View {
                     .shadow(color: LG.red.opacity(0.38), radius: 15, y: 12)
             }
             .buttonStyle(.plain)
-            LGRoundGlassButton(systemName: "message") {
-                // 预留：快捷回复/弹幕操作位（mockup msg 键）
+            // 眼镜端过滤档循环：全部 → 仅高价值 → 暂停（与 captouch 单击语义一致）
+            LGRoundGlassButton(systemName: filterIcon, tint: filterTint) {
+                store.cycleFilterMode()
             }
         }
         .padding(.horizontal, 2)
         .padding(.top, 6)
         .padding(.bottom, 12)
+    }
+
+    private var filterIcon: String {
+        switch store.snapshot.filterMode {
+        case .all: return "message"
+        case .highValueOnly: return "star"
+        case .paused: return "pause"
+        }
+    }
+
+    private var filterTint: Color? {
+        switch store.snapshot.filterMode {
+        case .all: return nil
+        case .highValueOnly: return LG.gold
+        case .paused: return LG.red
+        }
     }
 }
 
