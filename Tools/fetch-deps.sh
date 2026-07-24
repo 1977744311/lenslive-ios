@@ -15,7 +15,7 @@ export HTTPS_PROXY="$PROXY" HTTP_PROXY="$PROXY"
 
 [ -d LensLive.xcodeproj ] || xcodegen generate
 
-echo "== 解析依赖（镜像: $MIRROR）=="
+echo "== 解析依赖 mirror=${MIRROR} =="
 xcodebuild -project LensLive.xcodeproj -scmProvider system -resolvePackageDependencies
 
 echo "== 全编译（iOS Simulator）=="
