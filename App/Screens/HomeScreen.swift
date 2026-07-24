@@ -13,7 +13,7 @@ struct HomeScreen: View {
         VStack(spacing: 16) {
             // 大标题
             Text("LensLive")
-                .font(.system(.largeTitle, weight: .heavy))
+                .font(.system(.title, weight: .heavy))
                 .foregroundStyle(LG.ink)
                 .kerning(0.2)
                 .frame(maxWidth: .infinity, alignment: .leading)

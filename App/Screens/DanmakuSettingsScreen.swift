@@ -15,7 +15,7 @@ struct DanmakuSettingsScreen: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 12) {
                 Text("弹幕")
-                    .font(.system(.largeTitle, weight: .heavy))
+                    .font(.system(.title, weight: .heavy))
                     .foregroundStyle(LG.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 4)

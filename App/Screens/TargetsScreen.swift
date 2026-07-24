@@ -19,7 +19,7 @@ struct TargetsScreen: View {
             VStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("推流目标")
-                        .font(.system(.largeTitle, weight: .heavy))
+                        .font(.system(.title, weight: .heavy))
                         .foregroundStyle(LG.ink)
                     Text("LIVE STREAMING")
                         .font(.system(.caption2, weight: .semibold))
