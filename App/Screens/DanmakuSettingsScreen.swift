@@ -15,7 +15,7 @@ struct DanmakuSettingsScreen: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 12) {
                 Text("弹幕")
-                    .font(.system(size: 30, weight: .heavy))
+                    .font(.system(.largeTitle, weight: .heavy))
                     .foregroundStyle(LG.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 4)
@@ -41,24 +41,28 @@ struct DanmakuSettingsScreen: View {
         VStack(spacing: 10) {
             HStack {
                 Text("眼镜端实时预览")
-                    .font(.system(size: 12.5))
+                    .font(.system(.caption))
                     .kerning(0.5)
-                    .foregroundStyle(LG.ter)
+                    .foregroundStyle(LG.sec)
                 Spacer()
                 Button {
                     store.cycleFilterMode()
                 } label: {
-                    LGGradientText(text: store.snapshot.filterMode.displayName, size: 12.5)
+                    LGGradientText(text: store.snapshot.filterMode.displayName, style: .caption)
+                        .frame(minHeight: 44)   // 纯文字控件补足触达目标
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("弹幕过滤")
+                .accessibilityValue(store.snapshot.filterMode.displayName)
             }
             GlassPreviewView(node: store.previewNode)
                 .frame(width: 168, height: 168)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: Color(hex: 0x1E2232).opacity(0.18), radius: 10, y: 6)
             Text("黑色区域在光波导上即透明（加色显示）")
-                .font(.system(size: 10.5))
-                .foregroundStyle(LG.ter)
+                .font(.system(.caption2))
+                .foregroundStyle(LG.sec)
         }
         .padding(14)
         .frame(maxWidth: .infinity)
@@ -132,10 +136,11 @@ struct DanmakuSettingsScreen: View {
     private func toggleRow(_ title: String, isOn: Binding<Bool>, isLast: Bool) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(.callout))
                 .foregroundStyle(LG.ink)
             Spacer()
-            Toggle("", isOn: isOn)
+            // 带标题的 Toggle + labelsHidden：视觉不变但 VoiceOver 能读到开关名称
+            Toggle(title, isOn: isOn)
                 .labelsHidden()
                 .tint(LG.green)
         }
@@ -163,6 +168,7 @@ extension DanmakuFilterMode {
 // 600×600 逻辑画布等比缩放到目标尺寸；黑底（光波导加色显示上=透明）；
 // text 三字号（heading 28 / body 18 / meta 13）两色（primary 白 / secondary #C6CAD2）
 // 映射自官方 Display 规范（对齐 glass-frames.jsx 的 G 常量）。
+// 注意：本视图内字号是物理眼镜屏的模拟，刻意不随 Dynamic Type 缩放。
 
 struct GlassPreviewView: View {
     let node: GlassNode

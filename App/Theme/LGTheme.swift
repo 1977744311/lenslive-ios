@@ -8,8 +8,9 @@ enum LG {
     // 基色
     static let bg = Color(hex: 0xFBFBFD)
     static let ink = Color(hex: 0x0B0B0F)
+    // sec ≈4.4:1（信息性次级文字下限）；ter 仅用于纯装饰/失效文字（HIG tertiary 语义）
     static let sec = Color(hex: 0x14161C).opacity(0.55)
-    static let ter = Color(hex: 0x14161C).opacity(0.32)
+    static let ter = Color(hex: 0x14161C).opacity(0.38)
     static let hair = Color(hex: 0x14161C).opacity(0.08)
     static let red = Color(hex: 0xFF3B30)
     static let green = Color(hex: 0x34C759)
@@ -112,7 +113,8 @@ struct LGGlassCardModifier: ViewModifier {
                     if tint {
                         shape.fill(LG.gradSoft)
                     } else {
-                        shape.fill(Color.white.opacity(0.66))
+                        // 内容层比功能层更实（HIG：玻璃留给功能层，内容层用常规材质保可读）
+                        shape.fill(Color.white.opacity(0.78))
                     }
                 }
             }
@@ -189,13 +191,13 @@ struct LGChip: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(.footnote, weight: .medium))
             .foregroundStyle(dark ? Color.white : LG.ink)
             .padding(.horizontal, 13)
             .padding(.vertical, 7)
             .background {
                 Capsule().fill(.ultraThinMaterial)
-                Capsule().fill(dark ? Color(hex: 0x14161E).opacity(0.42) : Color.white.opacity(0.62))
+                Capsule().fill(dark ? Color(hex: 0x14161E).opacity(0.42) : Color.white.opacity(0.70))
             }
             .overlay {
                 Capsule().strokeBorder(Color.white.opacity(dark ? 0.25 : 0.9), lineWidth: 0.5)
@@ -241,20 +243,20 @@ struct LGRow: View {
         HStack(spacing: 12) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(.subheadline, weight: .regular))
                     .foregroundStyle(Color(hex: 0x14161C).opacity(0.45))
                     .frame(width: 18)
             }
             Text(title)
-                .font(.system(size: 16))
+                .font(.system(.callout))
                 .foregroundStyle(LG.ink)
             Spacer(minLength: 8)
             Text(value)
-                .font(.system(size: 15))
+                .font(.system(.subheadline))
                 .foregroundStyle(valueColor)
             if showsChevron {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(.caption, weight: .semibold))
                     .foregroundStyle(LG.ter)
             }
         }
@@ -276,12 +278,12 @@ struct LGRow: View {
 
 struct LGGradientText: View {
     let text: String
-    var size: CGFloat = 14.5
+    var style: Font.TextStyle = .subheadline
     var weight: Font.Weight = .bold
 
     var body: some View {
         Text(text)
-            .font(.system(size: size, weight: weight))
+            .font(.system(style, weight: weight))
             .foregroundStyle(LG.grad)
     }
 }
@@ -290,6 +292,7 @@ struct LGGradientText: View {
 
 struct LGPrimaryCTA: View {
     let title: String
+    var isBusy = false
     let action: () -> Void
 
     var body: some View {
@@ -306,10 +309,17 @@ struct LGPrimaryCTA: View {
                         .padding(.horizontal, 26)
                     Spacer()
                 }
-                Text(title)
-                    .font(.system(size: 19, weight: .heavy))
-                    .tracking(2)
-                    .foregroundStyle(LG.ink)
+                HStack(spacing: 10) {
+                    if isBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(LG.ink)
+                    }
+                    Text(isBusy ? "正在连接…" : title)
+                        .font(.system(.title3, weight: .heavy))
+                        .tracking(2)
+                        .foregroundStyle(LG.ink)
+                }
             }
             .frame(height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
@@ -322,6 +332,7 @@ struct LGPrimaryCTA: View {
             .shadow(color: LG.gradLime.opacity(0.28), radius: 25, y: 16)
         }
         .buttonStyle(.plain)
+        .disabled(isBusy)
     }
 }
 
@@ -335,7 +346,7 @@ struct LGRoundGlassButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 17, weight: .regular))
+                .font(.system(.body, weight: .regular))
                 .foregroundStyle(tint ?? Color(hex: 0x14161C).opacity(0.45))
                 .frame(width: 58, height: 58)
                 .background {

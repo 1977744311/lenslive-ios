@@ -13,7 +13,7 @@ struct HomeScreen: View {
         VStack(spacing: 16) {
             // 大标题
             Text("LensLive")
-                .font(.system(size: 34, weight: .heavy))
+                .font(.system(.largeTitle, weight: .heavy))
                 .foregroundStyle(LG.ink)
                 .kerning(0.2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -24,15 +24,23 @@ struct HomeScreen: View {
 
             Spacer(minLength: 12)
 
+            if let error = store.startError {
+                Text(error)
+                    .font(.system(.footnote, weight: .medium))
+                    .foregroundStyle(LG.red)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+            }
+
             // 液态玻璃 CTA
-            LGPrimaryCTA(title: "开始直播") {
+            LGPrimaryCTA(title: "开始直播", isBusy: store.snapshot.phase == .preparing) {
                 store.startLive()
             }
 
             // 底部边界文案（明确不做开播动作）
             Text("开播动作请先在 B 站直播姬完成 · 本机只负责推流")
-                .font(.system(size: 12.5))
-                .foregroundStyle(LG.ter)
+                .font(.system(.caption))
+                .foregroundStyle(LG.sec)
                 .frame(maxWidth: .infinity)
                 .padding(.top, -4)
         }
@@ -65,9 +73,10 @@ struct HomeScreen: View {
                     .fill(glassesConnected ? LG.green : LG.ter)
                     .frame(width: 8, height: 8)
                 Text(glassesConnected ? "已连接 · Ray-Ban Display" : "待连接 · Ray-Ban Display")
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(LG.ink)
             }
+            .accessibilityElement(children: .combine)
 
             HStack(spacing: 8) {
                 LGChip(label: "温度 \(thermalLabel)")

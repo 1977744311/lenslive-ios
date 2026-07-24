@@ -16,7 +16,7 @@ struct TargetsScreen: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 10) {
                 Text("推流目标")
-                    .font(.system(size: 30, weight: .heavy))
+                    .font(.system(.largeTitle, weight: .heavy))
                     .foregroundStyle(LG.ink)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 6)
@@ -34,13 +34,14 @@ struct TargetsScreen: View {
                     showGuide = true
                 } label: {
                     LGGradientText(text: "如何获取推流地址？")
+                        .frame(minHeight: 44)   // 纯文字入口补足触达目标
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 8)
 
                 Text("密钥仅存本机钥匙串 · 开播动作在平台官方工具完成")
-                    .font(.system(size: 12))
-                    .foregroundStyle(LG.ter)
+                    .font(.system(.caption))
+                    .foregroundStyle(LG.sec)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 16)
             }
@@ -73,7 +74,7 @@ struct TargetsScreen: View {
         VStack(spacing: 0) {
             configRow(label: "服务器") {
                 Text(store.selectedTarget.serverURL)
-                    .font(.system(size: 13.5, design: .monospaced))
+                    .font(.system(.footnote, design: .monospaced))
                     .foregroundStyle(LG.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -87,9 +88,9 @@ struct TargetsScreen: View {
 
             configRow(label: "串流密钥") {
                 Text(store.hasStreamKey ? "••••••••" : "未配置")
-                    .font(.system(size: 15))
+                    .font(.system(.subheadline))
                     .kerning(store.hasStreamKey ? 3 : 0)
-                    .foregroundStyle(store.hasStreamKey ? LG.ink : LG.ter)
+                    .foregroundStyle(store.hasStreamKey ? LG.ink : LG.sec)
             }
             .onTapGesture { editingKey = true }
 
@@ -99,17 +100,17 @@ struct TargetsScreen: View {
                 switch store.connectionTest {
                 case .notRun:
                     Text("点按测试")
-                        .font(.system(size: 15))
+                        .font(.system(.subheadline))
                         .foregroundStyle(LG.sec)
                 case .testing:
                     ProgressView().controlSize(.small)
                 case .passed(let ms):
                     Text("通过 · \(ms)ms")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(.subheadline, weight: .bold))
                         .foregroundStyle(LG.green)
                 case .failed:
                     Text("失败 · 检查地址")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(.subheadline, weight: .bold))
                         .foregroundStyle(LG.red)
                 }
             }
@@ -121,13 +122,13 @@ struct TargetsScreen: View {
     private func configRow(label: String, @ViewBuilder value: () -> some View) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 15))
+                .font(.system(.subheadline))
                 .foregroundStyle(LG.sec)
             Spacer(minLength: 12)
             value()
         }
         .padding(.horizontal, 17)
-        .padding(.vertical, 13)
+        .frame(minHeight: 48)
         .contentShape(Rectangle())
     }
 }
@@ -144,11 +145,11 @@ private struct TargetCard: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(target.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(.callout, weight: .semibold))
                         .foregroundStyle(LG.ink)
                     Text(subtitle)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(LG.ter)
+                        .font(.system(.caption))
+                        .foregroundStyle(LG.sec)
                 }
                 Spacer(minLength: 8)
                 if selected {
@@ -171,6 +172,7 @@ private struct TargetCard: View {
             .lgGlassCard(cornerRadius: 20, gradientBorder: selected)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var subtitle: String {
@@ -216,8 +218,8 @@ private struct GuideSheet: View {
                             "抖音无合规弹幕通道：眼镜端将使用纯推流状态屏",
                         ])
                     Text("合规边界：本 App 不内置任何平台推流码抓取或权限绕过；开播动作一律在平台官方工具完成。")
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(LG.ter)
+                        .font(.system(.caption))
+                        .foregroundStyle(LG.sec)
                         .padding(.top, 4)
                 }
                 .padding(20)
@@ -236,17 +238,17 @@ private struct GuideSheet: View {
     private func guideSection(title: String, steps: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(.callout, weight: .bold))
                 .foregroundStyle(LG.ink)
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                 HStack(alignment: .top, spacing: 10) {
                     Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(.caption, weight: .bold))
                         .foregroundStyle(LG.gradGreen)
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(LG.gradGreen.opacity(0.12)))
                     Text(step)
-                        .font(.system(size: 14.5))
+                        .font(.system(.subheadline))
                         .foregroundStyle(LG.ink.opacity(0.85))
                         .lineSpacing(3)
                 }

@@ -7,6 +7,7 @@ import LensLiveCore
 
 struct ConsoleScreen: View {
     @Environment(LiveSessionStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showEndConfirm = false
     @State private var dismissedNoticeID = 0
     @State private var previewCollapsed = false
@@ -41,6 +42,17 @@ struct ConsoleScreen: View {
         } message: {
             Text("推流与弹幕连接将有序断开")
         }
+        // 触觉反馈：开播成功一次 success；新异常横幅一次 warning（HIG：动作要有非视觉反馈）
+        .sensoryFeedback(.success, trigger: store.snapshot.startedAt) { old, new in
+            old == nil && new != nil
+        }
+        .sensoryFeedback(.warning, trigger: store.snapshot.notices.last?.id) { old, new in
+            new != nil && old != new
+        }
+    }
+
+    private var isPreparing: Bool {
+        store.snapshot.phase == .preparing
     }
 
     // MARK: - 玻璃胶囊状态栏
@@ -49,38 +61,53 @@ struct ConsoleScreen: View {
         HStack {
             LGGlassCapsule {
                 HStack(spacing: 10) {
-                    Circle()
-                        .fill(LG.red)
-                        .frame(width: 9, height: 9)
-                        .shadow(color: LG.red.opacity(0.55), radius: 4)
-                    Text("LIVE")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(1.5)
-                        .foregroundStyle(LG.ink)
-                    Rectangle()
-                        .fill(LG.hair)
-                        .frame(width: 1, height: 15)
-                    // 走秒由 TimelineView 驱动，与快照 startedAt 对齐
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        Text(elapsedText)
-                            .font(.system(size: 17, weight: .bold))
-                            .monospacedDigit()
-                            .kerning(0.5)
+                    if isPreparing {
+                        // 连接尚未建立：不亮红 LIVE，给明确的进行中反馈
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(LG.ink)
+                        Text("准备中")
+                            .font(.system(.subheadline, weight: .heavy))
+                            .tracking(1.5)
                             .foregroundStyle(LG.ink)
+                    } else {
+                        Circle()
+                            .fill(LG.red)
+                            .frame(width: 9, height: 9)
+                            .shadow(color: LG.red.opacity(0.55), radius: 4)
+                        Text("LIVE")
+                            .font(.system(.subheadline, weight: .heavy))
+                            .tracking(1.5)
+                            .foregroundStyle(LG.ink)
+                        Rectangle()
+                            .fill(LG.hair)
+                            .frame(width: 1, height: 15)
+                        // 走秒由 TimelineView 驱动，与快照 startedAt 对齐
+                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                            Text(elapsedText)
+                                .font(.system(.body, weight: .bold))
+                                .monospacedDigit()
+                                .kerning(0.5)
+                                .foregroundStyle(LG.ink)
+                        }
                     }
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(isPreparing ? "准备中" : "直播中，已进行 \(elapsedText)")
             Spacer()
             LGGlassCapsule {
                 HStack(spacing: 7) {
                     Image(systemName: "person")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(.footnote, weight: .medium))
                         .foregroundStyle(Color(hex: 0x14161C).opacity(0.5))
                     Text(viewersText)
-                        .font(.system(size: 14.5, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(LG.ink)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("观众 \(viewersText)")
         }
     }
 
@@ -108,8 +135,8 @@ struct ConsoleScreen: View {
                     .font(.system(size: 30, weight: .light))
                     .foregroundStyle(Color.white.opacity(0.55))
                 Text("POV 预览 · 等待眼镜相机帧")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.white.opacity(0.45))
+                    .font(.system(.footnote))
+                    .foregroundStyle(Color.white.opacity(0.55))
                 HStack(spacing: 8) {
                     statChip(statBitrate)
                     statChip(statFps)
@@ -132,7 +159,7 @@ struct ConsoleScreen: View {
     private var collapsedStatsBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "video.slash")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(.caption, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.55))
             statChip(statBitrate)
             statChip(statFps)
@@ -157,7 +184,7 @@ struct ConsoleScreen: View {
 
     private func statChip(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(.caption2, weight: .medium))
             .monospacedDigit()
             .foregroundStyle(Color.white.opacity(0.85))
             .padding(.horizontal, 9)
@@ -172,22 +199,26 @@ struct ConsoleScreen: View {
         if let dated = store.snapshot.notices.last, dated.id != dismissedNoticeID {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(.caption, weight: .semibold))
                 Text(dated.notice.bannerText)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(.footnote, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 Button {
                     dismissedNoticeID = dated.id
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(.caption2, weight: .bold))
+                        .frame(width: 32, height: 32)   // 触达目标补足（胶囊自身高度有限）
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("关闭提示")
             }
             .foregroundStyle(LG.gold)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .padding(.leading, 14)
+            .padding(.trailing, 4)
+            .padding(.vertical, 4)
             .background(Capsule().fill(Color(hex: 0xFFC44D).opacity(0.16)))
             .padding(.top, 10)
         }
@@ -213,7 +244,10 @@ struct ConsoleScreen: View {
                 .padding(.vertical, 14)
             }
             .onChange(of: store.snapshot.danmakuBuffer.last?.id) { _, lastID in
-                if let lastID {
+                guard let lastID else { return }
+                if reduceMotion {
+                    proxy.scrollTo(lastID, anchor: .bottom)
+                } else {
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo(lastID, anchor: .bottom)
                     }
@@ -228,15 +262,20 @@ struct ConsoleScreen: View {
         HStack(spacing: 14) {
             // 收起/展开 POV 预览（收起后弹幕流占满，指标条仍在）
             LGRoundGlassButton(systemName: previewCollapsed ? "video.slash" : "video") {
-                withAnimation(.spring(duration: 0.35)) {
+                if reduceMotion {
                     previewCollapsed.toggle()
+                } else {
+                    withAnimation(.spring(duration: 0.35)) {
+                        previewCollapsed.toggle()
+                    }
                 }
             }
+            .accessibilityLabel(previewCollapsed ? "展开 POV 预览" : "收起 POV 预览")
             Button {
                 showEndConfirm = true
             } label: {
                 Text("结束直播")
-                    .font(.system(size: 17, weight: .heavy))
+                    .font(.system(.body, weight: .heavy))
                     .tracking(2)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -255,6 +294,8 @@ struct ConsoleScreen: View {
             LGRoundGlassButton(systemName: filterIcon, tint: filterTint) {
                 store.cycleFilterMode()
             }
+            .accessibilityLabel("弹幕过滤")
+            .accessibilityValue(store.snapshot.filterMode.displayName)
         }
         .padding(.horizontal, 2)
         .padding(.top, 6)
@@ -290,22 +331,23 @@ private struct DanmakuRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(event.user)
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(.footnote, weight: .medium))
                         .foregroundStyle(LG.sec)
                     Spacer()
                     Text(relativeTime)
-                        .font(.system(size: 12))
+                        .font(.system(.caption))
                         .monospacedDigit()
-                        .foregroundStyle(LG.ter)
+                        .foregroundStyle(LG.sec)
                 }
                 Text(event.text)
-                    .font(.system(size: 15.5))
-                    .foregroundStyle(event.kind == .enter ? LG.ter : LG.ink)
+                    .font(.system(.callout))
+                    .foregroundStyle(event.kind == .enter ? LG.sec : LG.ink)
                     .lineSpacing(3)
             }
             .padding(.top, 1)
         }
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
     }
 
     private var relativeTime: String {
@@ -326,17 +368,17 @@ private struct SuperChatCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 9) {
                     Text(event.user)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(.subheadline, weight: .bold))
                         .foregroundStyle(LG.ink)
                     Text(badgeText)
-                        .font(.system(size: 13, weight: .heavy))
+                        .font(.system(.footnote, weight: .heavy))
                         .foregroundStyle(LG.gold)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 2.5)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0xFFC44D).opacity(0.20)))
                 }
                 Text(event.text)
-                    .font(.system(size: 15.5, weight: .medium))
+                    .font(.system(.callout, weight: .medium))
                     .foregroundStyle(LG.ink)
             }
             Spacer(minLength: 6)
@@ -344,6 +386,7 @@ private struct SuperChatCard: View {
                 .font(.system(size: 22, weight: .regular))
                 .foregroundStyle(Color(hex: 0xE3B23C))
         }
+        .accessibilityElement(children: .combine)
         .padding(.leading, 13)
         .padding(.trailing, 20)
         .padding(.vertical, 12)

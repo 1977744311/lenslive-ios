@@ -91,6 +91,9 @@ final class LiveSessionStore {
     // 根 Tab 选中态（首页配置行作跳转入口，避免与 Tab 重复导航）
     var selectedTab: RootTab = .home
 
+    // 开播失败原因（PRD F8 无静默失败：上浮到首页 CTA 下方，重试时清除）
+    private(set) var startError: String?
+
     // 配置态（开播前的选择；开播后以快照为准）
     private(set) var targets: [RTMPTarget]
     private(set) var selectedTargetID: UUID
@@ -186,6 +189,7 @@ final class LiveSessionStore {
     // MARK: 会话动作
 
     func startLive() {
+        startError = nil
         let target = selectedTarget
         let streamKey = keychain.read(forKey: target.streamKeyRef)
             ?? (isMockMode ? "mock-stream-key" : "")
@@ -203,7 +207,7 @@ final class LiveSessionStore {
             do {
                 try await coordinator.startLive(configuration: configuration)
             } catch {
-                // glasses.start 失败：留在首页，连接状态行呈现未就绪（无静默失败）
+                startError = "开播失败：\(error.localizedDescription)"
             }
         }
     }
