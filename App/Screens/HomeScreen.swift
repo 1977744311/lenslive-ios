@@ -46,7 +46,7 @@ struct HomeScreen: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
-        .padding(.bottom, 12)
+        .padding(.bottom, 30)   // 与悬浮 Tab 栏保持呼吸距离
         .lgPage()
     }
 
