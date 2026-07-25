@@ -10,15 +10,21 @@ public final class StreamBroadcaster<Element: Sendable>: @unchecked Sendable {
     private var latest: Element?
     private var finished = false
     private let replaysLatest: Bool
+    private let bufferingPolicy: AsyncStream<Element>.Continuation.BufferingPolicy
 
-    /// - Parameter replaysLatest: 状态类流应传 true——新订阅者立即收到最近一次值；
-    ///   事件类流（fault/captouch/frame）传 false。
-    public init(replaysLatest: Bool = false) {
+    /// - Parameters:
+    ///   - replaysLatest: 状态类流应传 true——新订阅者立即收到最近一次值；
+    ///     事件类流（fault/captouch/frame）传 false。
+    ///   - bufferingPolicy: 订阅流的缓冲策略。高频大载荷流（如相机帧）应传
+    ///     `.bufferingNewest(n)`——消费端（编码/网络）阻塞时丢旧帧而不是无限积压。
+    public init(replaysLatest: Bool = false,
+                bufferingPolicy: AsyncStream<Element>.Continuation.BufferingPolicy = .unbounded) {
         self.replaysLatest = replaysLatest
+        self.bufferingPolicy = bufferingPolicy
     }
 
     public func subscribe() -> AsyncStream<Element> {
-        AsyncStream(bufferingPolicy: .unbounded) { continuation in
+        AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
             let id = UUID()
             lock.lock()
             if finished {

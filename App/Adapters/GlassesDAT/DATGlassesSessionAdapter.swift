@@ -45,7 +45,9 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     private let thermalBus = StreamBroadcaster<GlassesKit.ThermalLevel>(replaysLatest: true)
     private let faultBus = StreamBroadcaster<GlassesFault>()
     private let captouchBus = StreamBroadcaster<CaptouchGesture>()
-    private let frameBus = StreamBroadcaster<CameraFramePacket>()
+    /// 帧流丢旧保新：RTMP 编码/网络阻塞时 24fps 的 CMSampleBuffer 不允许无限积压
+    /// （参考实现 TurboMeta 用"跳过处理中帧"达成同一目的）
+    private let frameBus = StreamBroadcaster<CameraFramePacket>(bufferingPolicy: .bufferingNewest(2))
     /// 契约缺口补充：captouch 流不带 tap 区域信息，组件级 onClick 的 actionID 走本流
     private let actionBus = StreamBroadcaster<String>()
 
@@ -131,6 +133,9 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
     public func attachCamera(preset: CameraPreset) async throws {
         guard let session else { throw GlassesSessionError.sessionNotStarted }
         guard cameraStream == nil else { return }
+        // 相机能力需要用户在 Meta AI app 侧授权（0.8.0 Permission API；
+        // 参考实现 TurboMeta 同样在开流前 check→request）
+        try await ensureCameraPermission()
         publishCamera(.waitingForDevice)
         // raw codec（研究文档 §8.1——直接 CMSampleBuffer 入 HaishinKit mixer，无重解码）
         let configuration = StreamConfiguration(
@@ -163,6 +168,21 @@ public actor DATGlassesSessionAdapter: GlassesSessionProviding {
         }
         cameraStream = nil
         publishCamera(.stopped)
+    }
+
+    /// 已授权直接通过；未授权发起系统请求（跳 Meta AI app），拒绝映射为 capabilityDenied
+    private func ensureCameraPermission() async throws {
+        do {
+            if try await Wearables.shared.checkPermissionStatus(.camera) == .granted { return }
+            guard try await Wearables.shared.requestPermission(.camera) == .granted else {
+                throw GlassesSessionError.capabilityDenied
+            }
+        } catch let error as GlassesSessionError {
+            throw error
+        } catch {
+            // PermissionError：Meta AI 未安装/设备无连接/请求超时等
+            throw GlassesSessionError.underlying(String(describing: error))
+        }
     }
 
     // MARK: - Display 能力
