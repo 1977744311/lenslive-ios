@@ -110,6 +110,7 @@ struct ConsoleScreen: View {
                             .font(.system(.subheadline, weight: .heavy))
                             .tracking(1.5)
                             .foregroundStyle(inkC)
+                            .fixedSize()   // 状态词与计时同为核心信息，挤压时不换行不消失
                         Rectangle()
                             .fill(hairC)
                             .frame(width: 1, height: 15)
@@ -120,6 +121,7 @@ struct ConsoleScreen: View {
                                 .monospacedDigit()
                                 .kerning(0.5)
                                 .foregroundStyle(inkC)
+                                .fixedSize()   // 计时是核心信息：被挤压时也不许换行
                         }
                     }
                 }
@@ -184,6 +186,13 @@ struct ConsoleScreen: View {
 
     private var viewersText: String {
         guard let viewers = store.snapshot.viewers else { return "—" }
+        // 上万后按直播平台惯例缩写，给胶囊宽度一个上界（长播时长+大观众数曾把计时挤到换行）
+        if viewers >= 1_000_000 {
+            return String(format: "%.0f万", Double(viewers) / 10_000)
+        }
+        if viewers >= 10_000 {
+            return String(format: "%.1f万", Double(viewers) / 10_000)
+        }
         return viewers.formatted(.number.grouping(.automatic))
     }
 
